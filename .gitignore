@@ -2,22 +2,20 @@
 .DS_Store
 
 # ============================================================
-# resume / audio 目录:只允许文本文件被 git 管理
-# 非文本文件(简历 PDF、原始录音等)一律不入库
+# resume / interview 目录:只允许文本文件(.txt/.md/.markdown)被 git 跟踪
+# 简历 PDF、面试录音等多媒体文件(通常在 media/ 子目录)一律不入库
 # ============================================================
 
-# 第一步:忽略这两个目录下的所有内容
 resume/*
-audio/*
-
-# 第二步:重新包含所有子目录(否则无法在子目录里放文本文件)
+resume/**/*
 !resume/**/
-!audio/**/
-
-# 第三步:重新包含文本文件(.txt / .md / .markdown)
 !resume/**/*.txt
 !resume/**/*.md
 !resume/**/*.markdown
-!audio/**/*.txt
-!audio/**/*.md
-!audio/**/*.markdown
+
+interview/*
+interview/**/*
+!interview/**/
+!interview/**/*.txt
+!interview/**/*.md
+!interview/**/*.markdown
