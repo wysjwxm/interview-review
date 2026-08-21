@@ -8,6 +8,13 @@
 纯 Python 标准库实现(3.8+),无第三方依赖。只在 127.0.0.1 监听,
 文件不离开本机。
 
+简历逻辑:
+- 上传页打开时可通过 GET /state 查询 resume/media 下已有的 PDF(取最新),
+  页面会展示并默认沿用;此时简历为可选。
+- 简历 PDF 不做改名/删除:每次上传直接存入 resume/media(保留上传文件名,
+  与已有同名时自动追加 " (2)"/" (3)" 序号);分析时以最新 PDF 为当前简历。
+- 简历文本统一整理到唯一的一份 resume/个人简历.md(替换上传时重新生成)。
+
 用法:
     python3 upload_server.py --root <项目根目录> \
         [--status <状态文件>] [--url-file <URL文件>] [--pidfile <PID文件>]
@@ -33,14 +40,64 @@ AUDIO_EXTS = {
 }
 RESUME_EXTS = {"pdf"}
 
+# 简历文本统一整理到这一份 md(resume/ 下唯一的一份简历文档)
+RESUME_MD = "resume/个人简历.md"
+
 MAX_BODY = 2 * 1024 * 1024 * 1024  # 2GB 上限,防止异常大包
 
 
 def sanitize_name(name):
-    """清洗会话名,防止路径穿越 / 非法字符。"""
+    """清洗会话/文件名,防止路径穿越、非法字符与隐藏文件点号开头。"""
     name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "", name).strip()
     name = re.sub(r"\s+", " ", name)
+    name = name.lstrip(".")
     return name or "未命名会话"
+
+
+def sanitize_filename(name):
+    """清洗上传的文件名(保留扩展名),用于落盘。"""
+    stem, ext = os.path.splitext(name)
+    stem = sanitize_name(stem) or "简历"
+    ext = (ext or "").lower()
+    return stem + ext
+
+
+def unique_path(directory, filename):
+    """返回不重名的路径:若目标已存在,自动追加 " (2)"/" (3)" 序号。"""
+    directory = Path(directory)
+    candidate = directory / filename
+    if not candidate.exists():
+        return candidate
+    stem, ext = os.path.splitext(filename)
+    n = 2
+    while True:
+        candidate = directory / ("%s (%d)%s" % (stem, n, ext))
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
+def find_existing_resume(root):
+    """返回 resume/media 下最新的 .pdf(作为「当前简历」),无则返回 None。
+
+    简历 md 统一为 resume/个人简历.md;media 下的 PDF 不做改名/删除。
+    """
+    resume_dir = Path(root) / "resume" / "media"
+    if not resume_dir.is_dir():
+        return None
+    pdfs = [p for p in resume_dir.iterdir() if p.suffix.lower() == ".pdf"]
+    if not pdfs:
+        return None
+    pdfs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    p = pdfs[0]
+    return {
+        "filename": p.name,
+        "stem": p.stem,
+        "path": str(p.relative_to(root)),
+        "md_path": RESUME_MD,
+        "has_md": (Path(root) / RESUME_MD).is_file(),
+        "size": p.stat().st_size,
+    }
 
 
 def parse_multipart(body, boundary):
@@ -103,6 +160,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in ("/", "/index.html"):
             self._serve_page()
+        elif self.path == "/state":
+            self._handle_state()
         else:
             respond(self, 404, {"ok": False, "error": "Not Found"})
 
@@ -125,9 +184,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    # ---- 状态(现有简历)----
+    def _handle_state(self):
+        root = Path(self.server.settings["root"])
+        respond(self, 200, {"ok": True, "existing_resume": find_existing_resume(root)})
+
     # ---- 上传 ----
     def _handle_upload(self):
         s = self.server.settings
+        root = Path(s["root"])
         ctype = self.headers.get("Content-Type", "")
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0 or length > MAX_BODY:
@@ -148,57 +213,72 @@ class Handler(BaseHTTPRequestHandler):
         if not fields.get("session"):
             session = time.strftime("%Y年%m月%d日 %H点%M分")
 
-        resume = files.get("resume")
+        resume = files.get("resume")      # 可选(已有现有简历时)
         audio = files.get("audio")
-        errors = []
-        if not resume:
-            errors.append("缺少简历 PDF")
         if not audio:
-            errors.append("缺少面试录音")
-        if errors:
-            respond(self, 400, {"ok": False, "error": "；".join(errors)})
+            respond(self, 400, {"ok": False, "error": "缺少面试录音"})
             return
 
-        rname, rdata = resume
+        existing = find_existing_resume(root)
+
+        # ---- 简历处理(media 不删除、不改名;md 统一写 resume/个人简历.md)----
+        if resume:
+            rname, rdata = resume
+            rext = os.path.splitext(rname)[1].lstrip(".").lower()
+            if rext not in RESUME_EXTS:
+                respond(self, 400, {"ok": False, "error": "简历必须是 PDF 文件"})
+                return
+            if not rdata.startswith(b"%PDF"):
+                respond(self, 400, {"ok": False, "error": "简历内容不是有效的 PDF(缺少 %PDF 头)"})
+                return
+
+            # 新简历直接保存(保留上传文件名);若与已有简历同名,自动加序号,不覆盖
+            resume_dir = root / "resume" / "media"
+            resume_dir.mkdir(parents=True, exist_ok=True)
+            target = unique_path(resume_dir, sanitize_filename(rname))
+            target.write_bytes(rdata)
+            resume_info = {
+                "filename": target.name,
+                "stem": target.stem,
+                "path": str(target.relative_to(root)),
+                "md_path": RESUME_MD,
+                "has_md": (root / RESUME_MD).is_file(),
+                "replaced": True,
+            }
+        else:
+            if not existing:
+                respond(self, 400, {"ok": False, "error": "缺少简历 PDF(且 resume/media 下没有现有简历)"})
+                return
+            resume_info = {
+                "filename": existing["filename"],
+                "stem": existing["stem"],
+                "path": existing["path"],
+                "md_path": existing["md_path"],
+                "has_md": existing["has_md"],
+                "replaced": False,
+            }
+
+        # ---- 音频处理 ----
         aname, adata = audio
-        rext = os.path.splitext(rname)[1].lstrip(".").lower()
         aext = os.path.splitext(aname)[1].lstrip(".").lower()
-
-        if rext not in RESUME_EXTS:
-            respond(self, 400, {"ok": False, "error": "简历必须是 PDF 文件"})
-            return
-        if not rdata.startswith(b"%PDF"):
-            respond(self, 400, {"ok": False, "error": "简历内容不是有效的 PDF(缺少 %PDF 头)"})
-            return
         if aext not in AUDIO_EXTS:
             respond(self, 400, {"ok": False, "error": "不支持的音频格式:%s" % (aext or "无扩展名")})
             return
 
-        root = Path(s["root"])
-        resume_dir = root / "resume" / "media"
         audio_dir = root / "interview" / "media"
-        resume_dir.mkdir(parents=True, exist_ok=True)
         audio_dir.mkdir(parents=True, exist_ok=True)
-
-        resume_rel = "resume/media/%s.pdf" % session
         audio_rel = "interview/media/%s.%s" % (session, aext)
-        rpath = root / resume_rel
         apath = root / audio_rel
-
-        overwritten = {"resume": rpath.exists(), "audio": apath.exists()}
-        rpath.write_bytes(rdata)
+        audio_overwritten = apath.exists()
         apath.write_bytes(adata)
 
         status = {
             "ok": True,
             "session_name": session,
-            "resume": {
-                "filename": rname, "path": resume_rel, "size": len(rdata),
-                "overwritten": overwritten["resume"],
-            },
+            "resume": resume_info,
             "audio": {
-                "filename": aname, "ext": aext, "path": audio_rel, "size": len(adata),
-                "overwritten": overwritten["audio"],
+                "filename": aname, "ext": aext, "path": audio_rel,
+                "size": len(adata), "overwritten": audio_overwritten,
             },
             "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }

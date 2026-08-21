@@ -11,6 +11,7 @@
     --text:#1c2333; --muted:#6a7185;
     --accent:#4f46e5; --accent-strong:#4338ca; --accent-weak:#eef0ff;
     --ok:#16a34a; --ok-weak:#ecfdf3; --err:#dc2626; --err-weak:#fef2f2;
+    --amber:#b45309; --amber-weak:#fffbeb;
     --radius:16px; --shadow:0 12px 34px rgba(24,32,68,.10);
   }
   *{box-sizing:border-box}
@@ -53,7 +54,7 @@
   }
   .zone:hover{border-color:var(--accent);background:var(--accent-weak)}
   .zone.dragover{border-color:var(--accent);background:var(--accent-weak)}
-  .zone.filled{border-style:solid;border-color:#b6c0f5}
+  .zone.filled{border-style:solid;border-color:#a9b8f0;background:#f5f6ff}
   .zone .zicon{font-size:26px;line-height:1}
   .zone .zlabel{font-weight:600;margin-top:8px}
   .zone .zhint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
@@ -63,8 +64,16 @@
     background:var(--accent-weak);border:1px solid #d9dcf7;border-radius:8px;
     padding:8px 10px;text-align:left;font-size:13px;
   }
-  .zone.filled .chip{display:flex}
+  .zone.filled .chip{display:flex;animation:fadeUp .18s ease}
   .zone.filled .zhint{display:none}
+  .zone.filled .zicon{font-size:20px}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .chip .tag{
+    flex:none;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;
+    background:var(--accent);color:#fff;
+  }
+  .chip .tag.keep{background:#059669}
+  .chip .tag.replace{background:var(--amber)}
   .chip .fi{flex:1;min-width:0}
   .chip .fname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .chip .fsize{color:var(--muted);font-size:12px;margin-top:2px}
@@ -74,6 +83,11 @@
   }
   .chip .remove:hover{color:var(--err);background:var(--err-weak)}
   .zones{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .resume-hint{
+    display:none;margin-top:12px;background:var(--amber-weak);
+    border:1px solid #fde68a;border-radius:10px;padding:9px 12px;
+    font-size:12.5px;color:var(--amber);line-height:1.6;
+  }
   .row{margin-top:16px}
   .row label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
   .row input[type=text]{
@@ -132,6 +146,7 @@
         <div class="zlabel">简历 PDF</div>
         <div class="zhint">拖拽到此处,或点击选择<br>仅支持 .pdf</div>
         <div class="chip">
+          <span class="tag" id="resume-tag"></span>
           <span class="fi"><div class="fname"></div><div class="fsize"></div></span>
           <button type="button" class="remove" title="移除">✕</button>
         </div>
@@ -142,16 +157,19 @@
         <div class="zlabel">面试录音</div>
         <div class="zhint">拖拽到此处,或点击选择<br>m4a / mp3 / wav / ogg / flac…</div>
         <div class="chip">
+          <span class="tag keep" id="audio-tag">已选择</span>
           <span class="fi"><div class="fname"></div><div class="fsize"></div></span>
           <button type="button" class="remove" title="移除">✕</button>
         </div>
       </div>
     </div>
 
+    <div class="resume-hint" id="resume-hint"></div>
+
     <div class="row">
       <label for="session">复盘名称(可选)</label>
       <input type="text" id="session" placeholder="如:2026年08月21日 拜特科技一面">
-      <div class="help">留空则自动生成时间戳名称;简历与录音将使用同一名称存放。</div>
+      <div class="help">留空则自动生成时间戳名称;录音与复盘文档使用该名称。</div>
     </div>
 
     <div class="error" id="error"></div>
@@ -178,7 +196,8 @@
 
 <script>
   var AUDIO_EXTS = ['m4a','mp3','wav','ogg','opus','flac','aac','amr','mp4','m4b','m4r','webm','caf','aiff','aif','wma'];
-  var state = { resume: null, audio: null };
+  var existingResume = null;                       // 来自 /state
+  var state = { resume: null, audio: null, keepExisting: false };
 
   function fmtSize(bytes){
     if(bytes == null) return '';
@@ -187,12 +206,61 @@
     return (i===0 ? ''+bytes : n.toFixed(1)) + ' ' + u[i];
   }
   function ext(name){ var m = /\.([^.]+)$/.exec(name || ''); return m ? m[1].toLowerCase() : ''; }
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function showError(msg){
     var e = document.getElementById('error');
     e.textContent = msg; e.style.display = 'block';
   }
   function clearError(){ document.getElementById('error').style.display = 'none'; }
+
+  function renderResumeZone(){
+    var zone = document.getElementById('zone-resume');
+    var tag = document.getElementById('resume-tag');
+    if(state.resume){
+      // 用户已拖入新简历 → 新增一份简历文件(不覆盖现有)
+      zone.querySelector('.fname').textContent = state.resume.file.name;
+      zone.querySelector('.fsize').textContent = fmtSize(state.resume.file.size);
+      tag.textContent = '新简历';
+      tag.className = 'tag replace';
+      zone.classList.add('filled');
+    } else if(existingResume){
+      // 沿用现有简历
+      zone.querySelector('.fname').textContent = existingResume.filename;
+      zone.querySelector('.fsize').textContent = fmtSize(existingResume.size);
+      tag.textContent = '已存在';
+      tag.className = 'tag keep';
+      zone.classList.add('filled');
+    } else {
+      zone.classList.remove('filled');
+    }
+    var hint = document.getElementById('resume-hint');
+    if(existingResume){
+      hint.style.display = 'block';
+      hint.innerHTML = state.resume
+        ? '将新增简历 <code>'+esc(state.resume.file.name)+'</code> 并覆盖当前简历 <code>'+esc(existingResume.filename)+'</code> 为最新;文件直接存入 <code>resume/media/</code>,不删除旧文件。'
+        : '检测到已有简历 <code>'+esc(existingResume.filename)+'</code>,默认沿用。拖入新 PDF 将作为最新简历保存(旧文件保留);不拖入则直接使用现有简历。';
+    } else {
+      hint.style.display = 'none';
+    }
+    updateSubmit();
+  }
+
+  function renderAudioZone(){
+    var zone = document.getElementById('zone-audio');
+    if(state.audio){
+      zone.querySelector('.fname').textContent = state.audio.file.name;
+      zone.querySelector('.fsize').textContent = fmtSize(state.audio.file.size);
+      zone.classList.add('filled');
+    } else {
+      zone.classList.remove('filled');
+    }
+    updateSubmit();
+  }
+
+  function renderZone(zoneKey){
+    if(zoneKey === 'audio'){ renderAudioZone(); } else { renderResumeZone(); }
+  }
 
   function bindZone(zoneKey, inputId){
     var zone = document.getElementById('zone-' + zoneKey);
@@ -209,20 +277,29 @@
       var err = valid(file);
       if(err){ showError(err); return; }
       clearError();
-      state[zoneKey] = { file: file };
-      zone.querySelector('.fname').textContent = file.name;
-      zone.querySelector('.fsize').textContent = fmtSize(file.size);
-      zone.classList.add('filled');
-      updateSubmit();
+      if(zoneKey === 'resume'){
+        state.resume = { file: file };
+        state.keepExisting = false;
+      } else {
+        state.audio = { file: file };
+      }
+      renderZone(zoneKey);
     }
 
     zone.addEventListener('click', function(){ input.click(); });
     zone.querySelector('.remove').addEventListener('click', function(ev){
       ev.stopPropagation();
-      state[zoneKey] = null;
-      input.value = '';
-      zone.classList.remove('filled');
-      updateSubmit();
+      if(zoneKey === 'resume'){
+        state.resume = null;
+        // 有现有简历则回到「沿用」,否则回到空
+        state.keepExisting = !!existingResume;
+        input.value = '';
+        renderResumeZone();
+      } else {
+        state.audio = null;
+        input.value = '';
+        renderZone('audio');
+      }
     });
     input.addEventListener('change', function(){ setFile(input.files[0]); });
 
@@ -239,7 +316,8 @@
   }
 
   function updateSubmit(){
-    document.getElementById('submit').disabled = !(state.resume && state.audio);
+    var okResume = state.resume || state.keepExisting || !!existingResume;
+    document.getElementById('submit').disabled = !(state.audio && okResume);
   }
 
   function setProgress(p){
@@ -248,10 +326,10 @@
   }
 
   document.getElementById('submit').addEventListener('click', function(){
-    if(!state.resume || !state.audio) return;
+    if(!state.audio || !(state.resume || state.keepExisting || existingResume)) return;
     clearError();
     var fd = new FormData();
-    fd.append('resume', state.resume.file);
+    if(state.resume) fd.append('resume', state.resume.file);   // 有新简历才带上,否则服务端沿用现有
     fd.append('audio', state.audio.file);
     fd.append('session', document.getElementById('session').value.trim());
 
@@ -267,9 +345,12 @@
         setProgress(100);
         var r = data, rs = r.resume, au = r.audio;
         var parts = [];
-        parts.push('复盘名称:<b>' + r.session_name + '</b>');
-        parts.push('简历:<code>' + rs.path + '</code>' + (rs.overwritten ? '(已覆盖同名)' : ''));
-        parts.push('录音:<code>' + au.path + '</code>' + (au.overwritten ? '(已覆盖同名)' : ''));
+        parts.push('复盘名称:<b>' + esc(r.session_name) + '</b>');
+        var rl = rs.replaced
+          ? '简历:<code>' + esc(rs.path) + '</code>(新简历已保存,将写入 <code>resume/个人简历.md</code>)'
+          : '简历:<code>' + esc(rs.path) + '</code>(沿用现有' + (rs.has_md ? ',已有解析文档,无需重新提取' : '') + ')';
+        parts.push(rl);
+        parts.push('录音:<code>' + esc(au.path) + '</code>' + (au.overwritten ? '(已覆盖同名)' : ''));
         document.getElementById('rbody').innerHTML = parts.join('<br>');
         document.getElementById('result').style.display = 'block';
         document.getElementById('progress').style.display = 'none';
@@ -287,6 +368,15 @@
     document.getElementById('progress').style.display = 'block';
     xhr.send(fd);
   });
+
+  // 页面加载:查询现有简历
+  fetch('/state').then(function(r){ return r.json(); }).then(function(d){
+    if(d && d.ok && d.existing_resume){
+      existingResume = d.existing_resume;
+      state.keepExisting = true;
+    }
+    renderResumeZone();
+  }).catch(function(){ renderResumeZone(); });
 
   bindZone('resume', 'file-resume');
   bindZone('audio', 'file-audio');

@@ -8,21 +8,13 @@
 __pycache__/
 *.pyc
 
+# Jetbrains
+.idea
+
 # ============================================================
-# resume / interview 目录:只允许文本文件(.txt/.md/.markdown)被 git 跟踪
-# 简历 PDF、面试录音等多媒体文件(通常在 media/ 子目录)一律不入库
+# resume / interview 目录为个人隐私，不进入git管理，如有需要，自行放行
 # ============================================================
 
-resume/*
-resume/**/*
-!resume/**/
-!resume/**/*.txt
-!resume/**/*.md
-!resume/**/*.markdown
+resume/
 
-interview/*
-interview/**/*
-!interview/**/
-!interview/**/*.txt
-!interview/**/*.md
-!interview/**/*.markdown
+interview/
