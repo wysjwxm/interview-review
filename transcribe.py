@@ -20,6 +20,7 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
+from typing import Optional, Tuple
 from urllib import error, request
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -61,7 +62,7 @@ def preprocess(audio: Path) -> Path:
     return tmp
 
 
-def multipart_body(fields, files):
+def multipart_body(fields: list, files: list) -> Tuple[bytes, str]:
     """构造 multipart/form-data 请求体,返回 (body_bytes, content_type)。"""
     boundary = "----transcribe-" + uuid.uuid4().hex
     body = bytearray()
@@ -80,24 +81,8 @@ def multipart_body(fields, files):
     return bytes(body), f"multipart/form-data; boundary={boundary}"
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="音频转文本(云端语音识别,OpenAI 兼容 API)")
-    parser.add_argument("audio", help="音频文件路径")
-    parser.add_argument("output", nargs="?", help="输出文件路径(省略则打印到标准输出)")
-    args = parser.parse_args()
-
-    load_dotenv(SCRIPT_DIR / ".env")
-
-    base_url = require("ASR_BASE_URL").rstrip("/")
-    api_key = require("ASR_API_KEY")
-    model = require("ASR_MODEL")
-    language = os.environ.get("ASR_LANGUAGE", "").strip()
-
-    audio = Path(args.audio)
-    if not audio.exists():
-        sys.exit(f"错误:找不到音频文件 {audio}")
-
-    # 预处理(ffmpeg 可用时),读入待上传的字节
+def build_payload(audio: Path) -> Tuple[bytes, str, str]:
+    """预处理音频并返回 (data, filename, content_type);ffmpeg 可用时转成 16kHz mp3。"""
     tmp = None
     upload = audio
     try:
@@ -107,11 +92,15 @@ def main() -> None:
         data = upload.read_bytes()
         filename = upload.name
         ctype = mimetypes.guess_type(str(upload))[0] or "application/octet-stream"
+        return data, filename, ctype
     finally:
         if tmp is not None:
             tmp.unlink(missing_ok=True)
 
-    # 组装并发送请求
+
+def transcribe(base_url: str, api_key: str, model: str, language: str,
+               data: bytes, filename: str, ctype: str) -> str:
+    """调用云端语音识别 API,返回识别文本(失败退出,文案与旧版逐字一致)。"""
     fields = [("model", model)]
     if language:
         fields.append(("language", language))
@@ -136,14 +125,38 @@ def main() -> None:
         text = json.loads(raw).get("text", "")
     except json.JSONDecodeError:
         text = raw
-    if not text:
-        text = raw
+    return text or raw
 
-    if args.output:
-        Path(args.output).write_text(text + "\n", encoding="utf-8")
-        print(f"已保存:{args.output}", file=sys.stderr)
+
+def write_result(text: str, output: Optional[str]) -> None:
+    """把识别文本写入文件(带换行)或打印到标准输出。"""
+    if output:
+        Path(output).write_text(text + "\n", encoding="utf-8")
+        print(f"已保存:{output}", file=sys.stderr)
     else:
         print(text)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="音频转文本(云端语音识别,OpenAI 兼容 API)")
+    parser.add_argument("audio", help="音频文件路径")
+    parser.add_argument("output", nargs="?", help="输出文件路径(省略则打印到标准输出)")
+    args = parser.parse_args()
+
+    load_dotenv(SCRIPT_DIR / ".env")
+
+    base_url = require("ASR_BASE_URL").rstrip("/")
+    api_key = require("ASR_API_KEY")
+    model = require("ASR_MODEL")
+    language = os.environ.get("ASR_LANGUAGE", "").strip()
+
+    audio = Path(args.audio)
+    if not audio.exists():
+        sys.exit(f"错误:找不到音频文件 {audio}")
+
+    data, filename, ctype = build_payload(audio)
+    text = transcribe(base_url, api_key, model, language, data, filename, ctype)
+    write_result(text, args.output)
 
 
 if __name__ == "__main__":

@@ -28,12 +28,13 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Optional
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_STATUS = Path(tempfile.gettempdir()) / "interview_review" / "upload.json"
 
 
-def open_browser(url):
+def open_browser(url: str) -> bool:
     """按平台打开浏览器;返回是否成功。"""
     if sys.platform == "darwin":
         cmd = ["open", url]
@@ -48,7 +49,7 @@ def open_browser(url):
         return False
 
 
-def stop_process(pidfile):
+def stop_process(pidfile: Path) -> None:
     """按 pidfile 结束上传服务进程(跨平台,尽力而为)。"""
     if not pidfile.is_file():
         return
@@ -67,10 +68,112 @@ def stop_process(pidfile):
         pass
 
 
-def main():
+def _quiet_unlink(path: Path) -> None:
+    """尽力删除临时文件(不存在则忽略)。"""
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _precheck(root: Path) -> Optional[str]:
+    """前置检查;通过返回 None,否则返回错误信息(已含「错误:」前缀)。"""
+    for name in ("upload_server.py", "upload_page.html"):
+        if not (SCRIPT_DIR / name).is_file():
+            return f"错误:项目根缺少 {name}"
+    if not (root / "interview").is_dir():
+        return f"错误:{root} 不是有效的项目根目录(缺少 interview/)"
+    return None
+
+
+def _start_server(root: Path, status_file: Path, url_file: Path, pid_file: Path):
+    """启动上传服务子进程;成功返回 Popen,失败返回 None(已打印错误)。"""
+    try:
+        return subprocess.Popen(
+            [sys.executable, str(SCRIPT_DIR / "upload_server.py"),
+             "--root", str(root),
+             "--status", str(status_file),
+             "--url-file", str(url_file),
+             "--pidfile", str(pid_file)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as exc:
+        print(f"错误:启动上传服务失败:{exc}", file=sys.stderr)
+        return None
+
+
+def wait_for_url(proc, url_file: Path, timeout: int = 15) -> Optional[str]:
+    """等待服务就绪并读取 URL;返回 URL,失败返回 None(已打印错误)。"""
+    for _ in range(timeout):
+        if proc.poll() is not None:
+            print("错误:上传服务启动失败", file=sys.stderr)
+            return None
+        if url_file.is_file():
+            url = url_file.read_text(encoding="utf-8").strip()
+            if url:
+                return url
+        time.sleep(1)
+    print(f"错误:等待上传服务 URL 超时({timeout}s)", file=sys.stderr)
+    return None
+
+
+def _open_browser_hint(url: str) -> None:
+    """打开浏览器并打印指引。"""
+    print("上传页地址:", url)
+    if open_browser(url):
+        print("浏览器已打开:请在页面提交 简历 PDF + 面试录音(有现有简历时可选不换,直接沿用)")
+    else:
+        print(f"无法自动打开浏览器,请手动访问:{url}")
+
+
+def _print_result(status_file: Path, data: dict) -> None:
+    """打印上传结果摘要。"""
+    resume = data.get("resume") or {}
+    audio = data.get("audio") or {}
+    print("\n✓ 上传完成,结果已写入:", status_file)
+    print("  复盘名称:", data.get("session_name"))
+    print("  简历:", resume.get("path") or "(未指定)")
+    print("  录音:", audio.get("path") or "(无)")
+    print("\n回到 Claude 输入「继续复盘」即可生成复盘文档。")
+
+
+def wait_for_upload(proc, status_file: Path, wait_seconds: int) -> int:
+    """轮询状态文件等待上传完成;返回退出码(0=成功,1=超时/服务异常)。"""
+    deadline = time.time() + wait_seconds
+    while time.time() < deadline:
+        if status_file.is_file():
+            try:
+                data = json.loads(status_file.read_text(encoding="utf-8"))
+            except (ValueError, OSError):
+                data = None  # 文件可能正在写入,继续等
+            if data and data.get("ok"):
+                _print_result(status_file, data)
+                return 0
+        if proc.poll() is not None and not status_file.is_file():
+            print("错误:上传服务意外退出", file=sys.stderr)
+            return 1
+        time.sleep(2)
+
+    print(f"✗ 等待上传超时({wait_seconds} 秒),未收到提交。如需重试请再次运行本脚本。", file=sys.stderr)
+    return 1
+
+
+def _cleanup(proc, pid_file: Path, url_file: Path) -> None:
+    """兜底清理服务进程与临时文件(上传成功时服务已自停,这里一般无操作)。"""
+    if proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    stop_process(pid_file)
+    _quiet_unlink(url_file)
+    _quiet_unlink(pid_file)
+
+
+def main() -> int:
     ap = argparse.ArgumentParser(description="面试复盘 · 一键触发上传")
     ap.add_argument("--status", default=str(DEFAULT_STATUS),
-                    help="上传结果 JSON 路径(默认:%s)" % DEFAULT_STATUS)
+                    help=f"上传结果 JSON 路径(默认:{DEFAULT_STATUS})")
     ap.add_argument("--root", default=str(SCRIPT_DIR),
                     help="项目根目录(默认:脚本所在目录;一般无需改动)")
     ap.add_argument("--max-wait", type=int, default=600,
@@ -81,13 +184,9 @@ def main():
     status_file = Path(args.status)
     status_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # 前置检查(脚本与上传服务在项目根,上传文件落盘到 --root)
-    for name in ("upload_server.py", "upload_page.html"):
-        if not (SCRIPT_DIR / name).is_file():
-            print("错误:项目根缺少 %s" % name, file=sys.stderr)
-            return 1
-    if not (root / "interview").is_dir():
-        print("错误:%s 不是有效的项目根目录(缺少 interview/)" % root, file=sys.stderr)
+    err = _precheck(root)
+    if err:
+        print(err, file=sys.stderr)
         return 1
 
     # 临时文件
@@ -96,88 +195,26 @@ def main():
     url_file = tmp / "url.txt"
     pid_file = tmp / "pid.txt"
     for f in (status_file, url_file, pid_file):
-        try:
-            f.unlink()
-        except OSError:
-            pass
+        _quiet_unlink(f)
 
-    # 启动上传服务
-    try:
-        proc = subprocess.Popen(
-            [sys.executable, str(SCRIPT_DIR / "upload_server.py"),
-             "--root", str(root),
-             "--status", str(status_file),
-             "--url-file", str(url_file),
-             "--pidfile", str(pid_file)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except OSError as exc:
-        print("错误:启动上传服务失败:%s" % exc, file=sys.stderr)
+    proc = _start_server(root, status_file, url_file, pid_file)
+    if proc is None:
         return 1
 
     try:
-        # 等待服务就绪,读取 URL
-        url = None
-        for _ in range(15):
-            if proc.poll() is not None:
-                print("错误:上传服务启动失败", file=sys.stderr)
-                return 1
-            if url_file.is_file():
-                url = url_file.read_text(encoding="utf-8").strip()
-                if url:
-                    break
-            time.sleep(1)
-        if not url:
-            print("错误:等待上传服务 URL 超时(15s)", file=sys.stderr)
+        url = wait_for_url(proc, url_file)
+        if url is None:
             return 1
 
-        print("上传页地址:", url)
-        if open_browser(url):
-            print("浏览器已打开:请在页面提交 简历 PDF + 面试录音(有现有简历时可选不换,直接沿用)")
-        else:
-            print("无法自动打开浏览器,请手动访问:%s" % url)
+        _open_browser_hint(url)
 
-        # 等待上传完成
-        deadline = time.time() + max(args.max_wait, 30)
-        while time.time() < deadline:
-            if status_file.is_file():
-                try:
-                    data = json.loads(status_file.read_text(encoding="utf-8"))
-                except (ValueError, OSError):
-                    data = None  # 文件可能正在写入,继续等
-                if data and data.get("ok"):
-                    print("\n✓ 上传完成,结果已写入:", status_file)
-                    resume = data.get("resume") or {}
-                    audio = data.get("audio") or {}
-                    print("  复盘名称:", data.get("session_name"))
-                    print("  简历:", resume.get("path") or "(未指定)")
-                    print("  录音:", audio.get("path") or "(无)")
-                    print("\n回到 Claude 输入「继续复盘」即可生成复盘文档。")
-                    return 0
-            if proc.poll() is not None and not status_file.is_file():
-                print("错误:上传服务意外退出", file=sys.stderr)
-                return 1
-            time.sleep(2)
-
-        print("✗ 等待上传超时(%d 秒),未收到提交。如需重试请再次运行本脚本。" % max(args.max_wait, 30),
-              file=sys.stderr)
-        return 1
+        wait_seconds = max(args.max_wait, 30)
+        return wait_for_upload(proc, status_file, wait_seconds)
     except KeyboardInterrupt:
         print("\n已取消,未收到上传。", file=sys.stderr)
         return 1
     finally:
-        # 清理服务进程(上传成功时服务会自停,这里兜底)
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-        stop_process(pid_file)
-        try:
-            url_file.unlink(missing_ok=True)
-            pid_file.unlink(missing_ok=True)
-        except OSError:
-            pass
+        _cleanup(proc, pid_file, url_file)
 
 
 if __name__ == "__main__":
