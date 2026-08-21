@@ -25,6 +25,8 @@
 │   ├── <名>.txt    # 「分析面试音频 <名>」时生成的转录文本
 │   └── <名>.md     # 「分析面试音频 <名>」生成的复盘分析文档
 ├── transcribe.py   # 音频转文本脚本(云端 API,动态配置)
+├── pdf2text.py     # PDF 简历转文本脚本(纯 Python,依赖 pypdf)
+├── requirements.txt # Python 依赖清单(仅 pypdf)
 ├── .env.example    # 转写服务配置模板(复制为 .env 后填写)
 ├── CLAUDE.md
 └── .gitignore      # 只跟踪 .txt/.md,忽略 PDF/音频/密钥等
@@ -34,7 +36,8 @@
 
 ### `分析简历 <名>`
 
-1. 读取 `resume/media/<名>.pdf`:先用 Read 工具直接读;若返回「Unsupported Document」(压缩型/图片型 PDF),改用 `pdftotext -layout "<文件>" -` 提取文字。
+1. 提取文本:运行 `python3 pdf2text.py "resume/media/<名>.pdf"`,读取脚本输出的文字。
+   > 首次使用前:`pip install -r requirements.txt`(仅一个依赖 `pypdf`,纯 Python、零传递依赖);若为扫描/图片型 PDF 无文本层,脚本会提示需 OCR。
 2. 把提取出的文本整理成 Markdown(保留原始结构,修正换行与明显识别误差),保存为 `resume/<名>.md`。**不做分析**。
 
 ### `分析面试音频 <名>`

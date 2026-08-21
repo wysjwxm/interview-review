@@ -1,0 +1,2 @@
+# PDF 简历文本提取(pdf2text.py 的唯一依赖)
+pypdf>=4
