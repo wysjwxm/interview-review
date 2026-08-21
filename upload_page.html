@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>面试复盘 · 提交材料</title>
+<style>
+  :root{
+    --bg1:#f6f7fc; --bg2:#eef1f8;
+    --card:#ffffff; --line:#e2e6f0; --line-strong:#c9cee2;
+    --text:#1c2333; --muted:#6a7185;
+    --accent:#4f46e5; --accent-strong:#4338ca; --accent-weak:#eef0ff;
+    --ok:#16a34a; --ok-weak:#ecfdf3; --err:#dc2626; --err-weak:#fef2f2;
+    --radius:16px; --shadow:0 12px 34px rgba(24,32,68,.10);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    color:var(--text);
+    display:flex;flex-direction:column;align-items:center;
+    padding:40px 16px 28px;
+  }
+  .wrap{width:100%;max-width:640px}
+  header{text-align:center;margin-bottom:24px}
+  header .badge{
+    display:inline-block;font-size:12px;font-weight:600;letter-spacing:.4px;
+    color:var(--accent);background:var(--accent-weak);
+    border:1px solid #d9dcf7;padding:4px 12px;border-radius:999px;margin-bottom:12px;
+  }
+  header h1{margin:0;font-size:26px;font-weight:700}
+  header p{margin:8px 0 0;color:var(--muted);font-size:14px;line-height:1.6}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:26px;
+  }
+  .steps{
+    display:flex;gap:6px;align-items:center;justify-content:center;
+    margin-bottom:22px;font-size:12.5px;color:var(--muted);
+  }
+  .steps .step{display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .steps .dot{
+    width:18px;height:18px;border-radius:50%;background:var(--accent-weak);color:var(--accent);
+    display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;
+  }
+  .steps .arr{color:var(--line-strong)}
+  .zone{
+    position:relative;border:2px dashed var(--line-strong);border-radius:12px;
+    padding:22px 16px;text-align:center;cursor:pointer;transition:.15s ease;
+    background:#fbfcfe;
+  }
+  .zone:hover{border-color:var(--accent);background:var(--accent-weak)}
+  .zone.dragover{border-color:var(--accent);background:var(--accent-weak)}
+  .zone.filled{border-style:solid;border-color:#b6c0f5}
+  .zone .zicon{font-size:26px;line-height:1}
+  .zone .zlabel{font-weight:600;margin-top:8px}
+  .zone .zhint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
+  .zone input[type=file]{display:none}
+  .zone .chip{
+    display:none;align-items:center;gap:8px;margin-top:12px;
+    background:var(--accent-weak);border:1px solid #d9dcf7;border-radius:8px;
+    padding:8px 10px;text-align:left;font-size:13px;
+  }
+  .zone.filled .chip{display:flex}
+  .zone.filled .zhint{display:none}
+  .chip .fi{flex:1;min-width:0}
+  .chip .fname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip .fsize{color:var(--muted);font-size:12px;margin-top:2px}
+  .chip .remove{
+    border:none;background:transparent;color:var(--muted);cursor:pointer;
+    font-size:16px;line-height:1;padding:4px;border-radius:6px;
+  }
+  .chip .remove:hover{color:var(--err);background:var(--err-weak)}
+  .zones{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .row{margin-top:16px}
+  .row label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+  .row input[type=text]{
+    width:100%;padding:10px 12px;border:1px solid var(--line-strong);border-radius:10px;
+    font-size:14px;background:#fff;color:var(--text);outline:none;transition:.15s;
+  }
+  .row input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+  .row .help{font-size:12px;color:var(--muted);margin-top:6px}
+  .error{
+    display:none;margin-top:14px;background:var(--err-weak);color:var(--err);
+    border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.5;
+  }
+  button.submit{
+    width:100%;margin-top:18px;border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),var(--accent-strong));color:#fff;
+    font-size:15px;font-weight:600;padding:13px;border-radius:11px;transition:.15s;
+    box-shadow:0 4px 14px rgba(79,70,229,.28);
+  }
+  button.submit:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(79,70,229,.34)}
+  button.submit:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+  .progress{display:none;margin-top:16px}
+  .progress .pbar{height:8px;background:#e7e9f4;border-radius:999px;overflow:hidden}
+  .progress .pfill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),#7c6cf0);border-radius:999px;transition:width .2s}
+  .progress .ptxt{margin-top:8px;font-size:12.5px;color:var(--muted);text-align:center}
+  .result{display:none;margin-top:18px;background:var(--ok-weak);border:1px solid #bbf7d0;border-radius:12px;padding:16px}
+  .result .rtitle{color:var(--ok);font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px}
+  .result .rbody{margin-top:10px;font-size:13.5px;line-height:1.7;color:var(--text)}
+  .result code{background:#fff;border:1px solid #d1fae5;border-radius:6px;padding:1px 6px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+  .result .rhint{margin-top:12px;padding-top:10px;border-top:1px dashed #b9eccb;color:var(--muted);font-size:12.5px;line-height:1.6}
+  footer{margin-top:20px;max-width:640px;font-size:12px;color:var(--muted);text-align:center;line-height:1.7}
+  footer b{color:var(--text)}
+  @media (max-width:560px){ .zones{grid-template-columns:1fr} .card{padding:18px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="badge">本地工具 · 数据不出本机</div>
+    <h1>面试复盘</h1>
+    <p>提交 <b>简历 PDF</b> 与 <b>面试录音</b>,上传后 Claude 会自动完成<br>转录、纠错与复盘文档的生成。</p>
+  </header>
+
+  <div class="card">
+    <div class="steps">
+      <span class="step"><span class="dot">1</span>上传材料</span>
+      <span class="arr">→</span>
+      <span class="step"><span class="dot">2</span>本地转写</span>
+      <span class="arr">→</span>
+      <span class="step"><span class="dot">3</span>生成复盘</span>
+    </div>
+
+    <div class="zones">
+      <div class="zone" id="zone-resume" data-zone="resume">
+        <input type="file" id="file-resume" accept=".pdf">
+        <div class="zicon">📄</div>
+        <div class="zlabel">简历 PDF</div>
+        <div class="zhint">拖拽到此处,或点击选择<br>仅支持 .pdf</div>
+        <div class="chip">
+          <span class="fi"><div class="fname"></div><div class="fsize"></div></span>
+          <button type="button" class="remove" title="移除">✕</button>
+        </div>
+      </div>
+      <div class="zone" id="zone-audio" data-zone="audio">
+        <input type="file" id="file-audio" accept=".m4a,.mp3,.wav,.ogg,.opus,.flac,.aac,.amr,.mp4,.m4b,.webm,.caf,.aiff,.aif,.wma">
+        <div class="zicon">🎙️</div>
+        <div class="zlabel">面试录音</div>
+        <div class="zhint">拖拽到此处,或点击选择<br>m4a / mp3 / wav / ogg / flac…</div>
+        <div class="chip">
+          <span class="fi"><div class="fname"></div><div class="fsize"></div></span>
+          <button type="button" class="remove" title="移除">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label for="session">复盘名称(可选)</label>
+      <input type="text" id="session" placeholder="如:2026年08月21日 拜特科技一面">
+      <div class="help">留空则自动生成时间戳名称;简历与录音将使用同一名称存放。</div>
+    </div>
+
+    <div class="error" id="error"></div>
+
+    <button class="submit" id="submit" disabled>提交并开始复盘</button>
+
+    <div class="progress" id="progress">
+      <div class="pbar"><div class="pfill" id="pfill"></div></div>
+      <div class="ptxt" id="ptxt">正在上传…</div>
+    </div>
+
+    <div class="result" id="result">
+      <div class="rtitle">✓ 上传成功</div>
+      <div class="rbody" id="rbody"></div>
+      <div class="rhint">请回到 Claude 终端,正在为你自动生成复盘文档。窗口可关闭。</div>
+    </div>
+  </div>
+
+  <footer>
+    <b>隐私说明:</b>简历仅在本机解析;面试录音会在本机预处理后,按你在
+    <code>.env</code> 中配置的语音识别服务上传转写。若介意可改用本地转写方案。
+  </footer>
+</div>
+
+<script>
+  var AUDIO_EXTS = ['m4a','mp3','wav','ogg','opus','flac','aac','amr','mp4','m4b','m4r','webm','caf','aiff','aif','wma'];
+  var state = { resume: null, audio: null };
+
+  function fmtSize(bytes){
+    if(bytes == null) return '';
+    var u = ['B','KB','MB','GB'], i = 0, n = bytes;
+    while(n >= 1024 && i < u.length-1){ n /= 1024; i++; }
+    return (i===0 ? ''+bytes : n.toFixed(1)) + ' ' + u[i];
+  }
+  function ext(name){ var m = /\.([^.]+)$/.exec(name || ''); return m ? m[1].toLowerCase() : ''; }
+
+  function showError(msg){
+    var e = document.getElementById('error');
+    e.textContent = msg; e.style.display = 'block';
+  }
+  function clearError(){ document.getElementById('error').style.display = 'none'; }
+
+  function bindZone(zoneKey, inputId){
+    var zone = document.getElementById('zone-' + zoneKey);
+    var input = document.getElementById(inputId);
+
+    function valid(file){
+      var e = ext(file.name);
+      if(zoneKey === 'resume') return e === 'pdf' ? null : '简历必须是 PDF 文件';
+      return AUDIO_EXTS.indexOf(e) >= 0 ? null : '不支持的音频格式:' + (e || '无扩展名');
+    }
+
+    function setFile(file){
+      if(!file) return;
+      var err = valid(file);
+      if(err){ showError(err); return; }
+      clearError();
+      state[zoneKey] = { file: file };
+      zone.querySelector('.fname').textContent = file.name;
+      zone.querySelector('.fsize').textContent = fmtSize(file.size);
+      zone.classList.add('filled');
+      updateSubmit();
+    }
+
+    zone.addEventListener('click', function(){ input.click(); });
+    zone.querySelector('.remove').addEventListener('click', function(ev){
+      ev.stopPropagation();
+      state[zoneKey] = null;
+      input.value = '';
+      zone.classList.remove('filled');
+      updateSubmit();
+    });
+    input.addEventListener('change', function(){ setFile(input.files[0]); });
+
+    ['dragenter','dragover'].forEach(function(evt){
+      zone.addEventListener(evt, function(e){ e.preventDefault(); zone.classList.add('dragover'); });
+    });
+    ['dragleave','drop'].forEach(function(evt){
+      zone.addEventListener(evt, function(e){ e.preventDefault(); zone.classList.remove('dragover'); });
+    });
+    zone.addEventListener('drop', function(e){
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if(f) setFile(f);
+    });
+  }
+
+  function updateSubmit(){
+    document.getElementById('submit').disabled = !(state.resume && state.audio);
+  }
+
+  function setProgress(p){
+    document.getElementById('pfill').style.width = p + '%';
+    document.getElementById('ptxt').textContent = p >= 100 ? '上传完成,正在等待 Claude 处理…' : '正在上传 ' + Math.round(p) + '% …';
+  }
+
+  document.getElementById('submit').addEventListener('click', function(){
+    if(!state.resume || !state.audio) return;
+    clearError();
+    var fd = new FormData();
+    fd.append('resume', state.resume.file);
+    fd.append('audio', state.audio.file);
+    fd.append('session', document.getElementById('session').value.trim());
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload');
+    xhr.upload.onprogress = function(e){
+      if(e.lengthComputable){ setProgress(e.loaded / e.total * 100); }
+    };
+    xhr.onload = function(){
+      var data;
+      try { data = JSON.parse(xhr.responseText); } catch(err){ data = null; }
+      if(xhr.status === 200 && data && data.ok){
+        setProgress(100);
+        var r = data, rs = r.resume, au = r.audio;
+        var parts = [];
+        parts.push('复盘名称:<b>' + r.session_name + '</b>');
+        parts.push('简历:<code>' + rs.path + '</code>' + (rs.overwritten ? '(已覆盖同名)' : ''));
+        parts.push('录音:<code>' + au.path + '</code>' + (au.overwritten ? '(已覆盖同名)' : ''));
+        document.getElementById('rbody').innerHTML = parts.join('<br>');
+        document.getElementById('result').style.display = 'block';
+        document.getElementById('progress').style.display = 'none';
+      } else {
+        setProgress(0);
+        document.getElementById('progress').style.display = 'none';
+        showError((data && data.error) ? data.error : '上传失败(' + xhr.status + '),请重试');
+      }
+    };
+    xhr.onerror = function(){
+      document.getElementById('progress').style.display = 'none';
+      showError('网络错误,上传失败,请重试');
+    };
+    document.getElementById('result').style.display = 'none';
+    document.getElementById('progress').style.display = 'block';
+    xhr.send(fd);
+  });
+
+  bindZone('resume', 'file-resume');
+  bindZone('audio', 'file-audio');
+  updateSubmit();
+</script>
+</body>
+</html>

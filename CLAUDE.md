@@ -10,6 +10,7 @@
 |------|------|----------|----------|
 | `分析简历 <名>` | 提取简历文本 | `resume/media/<名>.pdf` | `resume/<名>.md` |
 | `分析面试音频 <名>` | 转写并复盘录音 | `interview/media/<名>.<扩展名>` | `interview/<名>.txt` + `interview/<名>.md` |
+| `我要面试复盘`(或 `/review`) | 弹出上传页面,提交简历 PDF + 面试录音 | 用户在浏览器上传(经 `upload_server.py`) | 自动执行下方「我要面试复盘」流程 |
 
 `<名>` 为多媒体文件的**不含扩展名的文件名**。若你只给了部分名字或文件名不确定,先列出 `media/` 目录下文件让你确认,再执行。
 
@@ -26,6 +27,9 @@
 │   └── <名>.md     # 「分析面试音频 <名>」生成的复盘分析文档
 ├── transcribe.py   # 音频转文本脚本(云端 API,动态配置)
 ├── pdf2text.py     # PDF 简历转文本脚本(纯 Python,依赖 pypdf)
+├── upload_server.py # 「我要面试复盘」上传服务(纯 Python 标准库,跨平台,本地 127.0.0.1)
+├── upload_page.html # 「我要面试复盘」浏览器上传页面
+├── .claude/commands/review.md # 「我要面试复盘」/`/review` 的编排流程说明
 ├── requirements.txt # Python 依赖清单(仅 pypdf)
 ├── .env.example    # 转写服务配置模板(复制为 .env 后填写)
 ├── CLAUDE.md
@@ -52,6 +56,22 @@
    - 分析问答双方话语,把「面试官」与「候选人」**分开排版**;
    - 结合候选人的**技术背景、行业背景**(参考简历),纠正识别错误的字词(技术名词、专业术语等,如 "ncks"→Nacos、"县程"→线程),并把纠正后的内容写回转录文本。
 3. **生成复盘文档**:结合简历背景与整理后的转录文本,生成 `interview/<名>.md`,见「面试复盘文档」章节。
+
+### `我要面试复盘`(上传式复盘)
+
+用户说「我要面试复盘」(或调用 `/review`)时,弹出浏览器上传页面,提交简历 PDF + 面试录音,随后自动执行完整复盘。详细步骤见 `.claude/commands/review.md`,此处为概要:
+
+1. **前置检查**:确认 `upload_server.py`、`upload_page.html` 存在。
+2. **启动上传服务**:后台运行 `python3 upload_server.py --root <项目根> --status <临时状态文件> --url-file <临时URL文件> --pidfile <临时PID文件>`;等待 URL 文件出现并读取实际地址。
+3. **打开浏览器**(macOS `open` / Linux `xdg-open` / Windows `start`),提示用户上传。
+4. **等待上传**:轮询状态文件(每 2 秒,最多约 10 分钟);成功后读取 `session_name`、`resume.path`、`audio.path`、`audio.ext`,并清理服务进程。
+5. **分析简历**:运行 `python3 pdf2text.py "<resume.path>"`,整理为 `resume/<session>.md`(仅整理,不做分析)。
+6. **转写并整理录音**:确认 `.env` 已配置,运行 `./transcribe.py "<audio.path>" "interview/<session>.txt"`,再区分说话人、纠正识别错误后写回该 `.txt`。
+7. **生成复盘文档**:生成 `interview/<session>.md`(5 个章节)。
+8. **汇报**:列出生成文件与关键结论。
+
+> 命名:上传页面有「复盘名称」输入框,简历与录音用同一名称(如 `resume/media/<session>.pdf`、`interview/media/<session>.<扩展名>`);留空则自动生成时间戳名称。
+> 隐私:服务只在 `127.0.0.1` 监听,文件不出本机;录音后续按 `.env` 配置上传语音识别服务转写。
 
 ## 分析文档章节
 
