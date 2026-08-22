@@ -9,13 +9,13 @@
     4. 把上传结果写入状态文件并打印其路径,退出码 0
 
 两种使用方式:
-- 用户直接在终端运行:`python3 start_review.py`
+- 用户直接在终端运行:`python3 scripts/start_review.py`
   → 上传完成后,回到 Claude 说一声,由 Claude 读取状态文件继续复盘。
 - Claude 收到「我要面试复盘」/ `/interview-review` 时:直接运行本脚本
   → 退出码 0 后读取状态文件,继续做简历提取、转写与复盘文档生成。
 
 用法:
-    python3 start_review.py [--status <结果JSON路径>] [--root <项目根>]
+    python3 scripts/start_review.py [--status <结果JSON路径>] [--root <项目根>]
 
 退出码:
     0  上传成功(状态文件已就绪)
@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # scripts/ 的上级 = 项目根
 DEFAULT_STATUS = Path(tempfile.gettempdir()) / "interview_review" / "upload.json"
 
 
@@ -88,8 +88,8 @@ def _ensure_env() -> None:
 
     复制后 ASR_API_KEY 仍为占位符,用户需自行填写真实值。
     """
-    env = SCRIPT_DIR / ".env"
-    example = SCRIPT_DIR / ".env.example"
+    env = PROJECT_ROOT / ".env"
+    example = PROJECT_ROOT / ".env.example"  # 与 .env 同层级(根目录)
     if env.exists() or not example.is_file():
         return
     try:
@@ -101,9 +101,9 @@ def _ensure_env() -> None:
 
 def _precheck() -> Optional[str]:
     """前置检查;通过返回 None,否则返回错误信息(已含「错误:」前缀)。"""
-    for name in ("upload_server.py", "upload_page.html"):
-        if not (SCRIPT_DIR / name).is_file():
-            return f"错误:项目根缺少 {name}"
+    for name in ("scripts/upload_server.py", "web/upload_page.html"):
+        if not (PROJECT_ROOT / name).is_file():
+            return f"错误:项目缺少 {name}"
     return None
 
 
@@ -111,7 +111,7 @@ def _start_server(root: Path, status_file: Path, url_file: Path, pid_file: Path)
     """启动上传服务子进程;成功返回 Popen,失败返回 None(已打印错误)。"""
     try:
         return subprocess.Popen(
-            [sys.executable, str(SCRIPT_DIR / "upload_server.py"),
+            [sys.executable, str(PROJECT_ROOT / "scripts" / "upload_server.py"),
              "--root", str(root),
              "--status", str(status_file),
              "--url-file", str(url_file),
@@ -195,8 +195,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="面试复盘 · 一键触发上传")
     ap.add_argument("--status", default=str(DEFAULT_STATUS),
                     help=f"上传结果 JSON 路径(默认:{DEFAULT_STATUS})")
-    ap.add_argument("--root", default=str(SCRIPT_DIR),
-                    help="项目根目录(默认:脚本所在目录;一般无需改动)")
+    ap.add_argument("--root", default=str(PROJECT_ROOT),
+                    help="项目根目录(默认:项目根;一般无需改动)")
     ap.add_argument("--max-wait", type=int, default=600,
                     help="最长等待秒数(默认 600 = 10 分钟)")
     args = ap.parse_args()

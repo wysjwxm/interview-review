@@ -16,7 +16,7 @@
 - 简历文本统一整理到唯一的一份 resume/个人简历.md(替换上传时重新生成)。
 
 用法:
-    python3 upload_server.py --root <项目根目录> \
+    python3 scripts/upload_server.py --root <项目根目录> \
         [--status <状态文件>] [--url-file <URL文件>] [--pidfile <PID文件>]
 
 作者: 个人项目(面试复盘)
@@ -33,7 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # scripts/ 的上级 = 项目根
 
 # 允许的音频扩展名(转写前会用 ffmpeg 统一预处理,格式限制放宽些)
 AUDIO_EXTS = {
@@ -339,7 +339,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="面试复盘上传服务(本地网页)")
-    parser.add_argument("--root", default=str(SCRIPT_DIR), help="项目根目录(默认:脚本所在目录)")
+    parser.add_argument("--root", default=str(PROJECT_ROOT), help="项目根目录(默认:项目根)")
     parser.add_argument("--status", help="上传结果写入的状态文件路径")
     parser.add_argument("--url-file", help="把实际访问 URL 写入该文件")
     parser.add_argument("--pidfile", help="把进程 PID 写入该文件")
@@ -350,7 +350,7 @@ def main() -> None:
         print(f"错误:目录 {root} 不是有效的项目根目录(缺少 interview/)", file=sys.stderr)
         sys.exit(1)
 
-    page_file = SCRIPT_DIR / "upload_page.html"
+    page_file = PROJECT_ROOT / "web" / "upload_page.html"
     try:
         page_html = page_file.read_text(encoding="utf-8")
     except FileNotFoundError:

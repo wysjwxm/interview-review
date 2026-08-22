@@ -10,7 +10,7 @@
 |------|------|----------|----------|
 | `分析简历 <名>` | 提取简历文本 | `resume/media/<名>.pdf` | `resume/个人简历.md` |
 | `分析面试音频 <名>` | 转写并复盘录音 | `interview/media/<名>.<扩展名>` | `interview/txt/<名>.txt` + `interview/<名>.md` |
-| `我要面试复盘`(或 `/interview-review`) | 运行 `start_review.py`,弹出上传页面、提交简历 PDF + 面试录音 | 用户在浏览器上传(经 `upload_server.py`) | 自动执行下方「我要面试复盘」流程 |
+| `我要面试复盘`(或 `/interview-review`) | 运行 `scripts/start_review.py`,弹出上传页面、提交简历 PDF + 面试录音 | 用户在浏览器上传(经 `scripts/upload_server.py`) | 自动执行下方「我要面试复盘」流程 |
 
 `<名>` 为多媒体文件的**不含扩展名的文件名**。若你只给了部分名字或文件名不确定,先列出 `media/` 目录下文件让你确认,再执行。
 
@@ -25,14 +25,16 @@
 │   ├── media/      # 面试录音(音频放这里,不入库)
 │   ├── txt/        # 转录文本(interview/txt/<名>.txt,「分析面试音频 <名>」与上传式复盘共用)
 │   └── <名>.md     # 「分析面试音频 <名>」生成的复盘分析文档
-├── transcribe.py   # 音频转文本脚本(云端 API,动态配置)
-├── pdf2text.py     # PDF 简历转文本脚本(纯 Python,依赖 pypdf)
-├── upload_server.py # 「我要面试复盘」上传服务(纯 Python 标准库,跨平台,本地 127.0.0.1)
-├── upload_page.html # 「我要面试复盘」浏览器上传页面
-├── start_review.py  # 「我要面试复盘」一键触发脚本(用户可直接运行,或由 Claude 运行)
+├── scripts/        # 可执行脚本
+│   ├── transcribe.py   # 音频转文本脚本(云端 API,动态配置)
+│   ├── pdf2text.py     # PDF 简历转文本脚本(纯 Python,依赖 pypdf)
+│   ├── upload_server.py # 「我要面试复盘」上传服务(纯 Python 标准库,跨平台,本地 127.0.0.1)
+│   └── start_review.py  # 「我要面试复盘」一键触发脚本(用户可直接运行,或由 Claude 运行)
+├── web/
+│   └── upload_page.html # 「我要面试复盘」浏览器上传页面
+├── .env.example    # 转写服务配置模板(与 .env 同层级,复制为 .env 后填写)
 ├── .claude/commands/interview-review.md # 「我要面试复盘」/`/interview-review` 的编排流程说明
 ├── requirements.txt # Python 依赖清单(仅 pypdf)
-├── .env.example    # 转写服务配置模板(复制为 .env 后填写)
 ├── CLAUDE.md
 └── .gitignore      # 只跟踪 .txt/.md,忽略 PDF/音频/密钥等
 ```
@@ -45,7 +47,7 @@
 |------|----------|--------------|
 | `pypdf` | 提取 PDF 简历时 | 询问用户后 `pip install -r requirements.txt` |
 | `ffmpeg` | 转写音频(可选,仅预处理) | 缺失不阻断,跳过预处理直接上传原音频 |
-| `.env`(ASR_*) | 转写音频(必需) | `start_review.py` 会自动复制 `.env`;提示用户填 `ASR_API_KEY` 真实值,配置前暂停 |
+| `.env`(ASR_*) | 转写音频(必需) | `scripts/start_review.py` 会自动复制 `.env`;提示用户填 `ASR_API_KEY` 真实值,配置前暂停 |
 
 检查命令:`python3 -c "import pypdf"`、`ffmpeg -version`、`[ -f .env ]`。
 
@@ -53,15 +55,15 @@
 
 ### `分析简历 <名>`
 
-1. 提取文本:运行 `python3 pdf2text.py "resume/media/<名>.pdf"`,读取脚本输出的文字。
+1. 提取文本:运行 `python3 scripts/pdf2text.py "resume/media/<名>.pdf"`,读取脚本输出的文字。
    > `pypdf` 依赖见「依赖预检」;若为扫描/图片型 PDF 无文本层,脚本会提示需 OCR。
 2. 把提取出的文本整理成 Markdown(保留原始结构,修正换行与明显识别误差),**覆盖写入** `resume/个人简历.md`。**不做分析**。
 
 ### `分析面试音频 <名>`
 
-1. **转写(云端 API)**:运行 `transcribe.py`,音频经 ffmpeg 预处理后上传到 `.env` 里配置的语音识别服务,返回文字:
+1. **转写(云端 API)**:运行 `scripts/transcribe.py`,音频经 ffmpeg 预处理后上传到 `.env` 里配置的语音识别服务,返回文字:
    ```bash
-   ./transcribe.py "interview/media/<名>.<扩展名>" "interview/txt/<名>.txt"
+   ./scripts/transcribe.py "interview/media/<名>.<扩展名>" "interview/txt/<名>.txt"
    ```
    > `.env` 配置见「依赖预检」(复制 `.env.example` 填 `ASR_*`,换服务只需改 `.env`);依赖 Python3 与 `ffmpeg`(可选),无需安装任何模型或第三方库。
 2. **整理转录文本**(写回 `interview/txt/<名>.txt`):对原始转录做二次处理——
@@ -71,12 +73,12 @@
 
 ### `我要面试复盘`(上传式复盘)
 
-用户说「我要面试复盘」(或调用 `/interview-review`)时,运行一键触发脚本 `start_review.py`(用户在终端直接运行它也可以),随后自动执行完整复盘。详细步骤见 `.claude/commands/interview-review.md`,此处为概要:
+用户说「我要面试复盘」(或调用 `/interview-review`)时,运行一键触发脚本 `scripts/start_review.py`(用户在终端直接运行它也可以),随后自动执行完整复盘。详细步骤见 `.claude/commands/interview-review.md`,此处为概要:
 
-1. **触发上传**:运行 `python3 start_review.py`,脚本自动完成——启动上传服务、打开浏览器上传页、等待提交(最多约 10 分钟)、写入结果并清理服务。用户提交简历 PDF + 面试录音。
+1. **触发上传**:运行 `python3 scripts/start_review.py`,脚本自动完成——启动上传服务、打开浏览器上传页、等待提交(最多约 10 分钟)、写入结果并清理服务。用户提交简历 PDF + 面试录音。
 2. **读取状态**:`start_review.py` 把上传结果写入状态 JSON(默认 `$TMPDIR/interview_review/upload.json`),读取 `session_name`、`resume.path`、`resume.md_path`、`resume.replaced`、`resume.has_md`、`audio.path`、`audio.ext`。
-3. **分析简历**:若 `resume.replaced == false` 且 `resume.has_md == true`(简历未变、md 已存在)则**直接复用** `resume/个人简历.md`,跳过提取;否则运行 `python3 pdf2text.py "<resume.path>"`,整理后**覆盖写入** `resume/个人简历.md`(仅整理,不做分析)。
-4. **转写并整理录音**:确认 `.env` 已配置,运行 `./transcribe.py "<audio.path>" "interview/txt/<session>.txt"`,再区分说话人、纠正识别错误后写回该 `.txt`。
+3. **分析简历**:若 `resume.replaced == false` 且 `resume.has_md == true`(简历未变、md 已存在)则**直接复用** `resume/个人简历.md`,跳过提取;否则运行 `python3 scripts/pdf2text.py "<resume.path>"`,整理后**覆盖写入** `resume/个人简历.md`(仅整理,不做分析)。
+4. **转写并整理录音**:确认 `.env` 已配置,运行 `./scripts/transcribe.py "<audio.path>" "interview/txt/<session>.txt"`,再区分说话人、纠正识别错误后写回该 `.txt`。
 5. **生成复盘文档**:生成 `interview/<session>.md`(5 个章节)。
 6. **汇报**:列出生成文件与关键结论。
 
@@ -108,4 +110,4 @@
 - 转录文本是复盘的事实依据;总结要具体到「哪个问题、哪句话、哪里答偏」,避免空泛。
 - 转录文本须区分说话人(面试官 / 候选人)并纠正识别错误(见「分析面试音频」步骤 2)。
 - 多媒体文件(PDF/音频)**只放 `media/` 子目录**;转录文本放 `interview/txt/`;`resume/`、`interview/` 根目录只放生成的 `.md`。
-- 隐私提示:简历仅在本机分析;录音会通过 `transcribe.py` 上传到你在 `.env` 配置的语音识别服务,若介意可改用本地转写方案。
+- 隐私提示:简历仅在本机分析;录音会通过 `scripts/transcribe.py` 上传到你在 `.env` 配置的语音识别服务,若介意可改用本地转写方案。

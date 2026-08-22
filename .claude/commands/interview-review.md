@@ -5,7 +5,7 @@ description: 弹出上传页面(简历 PDF + 面试录音),自动执行面试复
 # 面试复盘 · 上传式
 
 用户输入「我要面试复盘」或调用 `/interview-review` 时,按下面流程执行。
-触发统一走一键脚本 `start_review.py`(纯 Python 标准库,跨平台,全程只在本机 `127.0.0.1` 监听);
+触发统一走一键脚本 `scripts/start_review.py`(纯 Python 标准库,跨平台,全程只在本机 `127.0.0.1` 监听);
 用户也可以自己在终端直接运行该脚本完成上传,再回到对话让我继续。
 
 ## 0. 依赖预检(先做,避免执行到一半才发现缺依赖)
@@ -15,7 +15,7 @@ description: 弹出上传页面(简历 PDF + 面试录音),自动执行面试复
 ```bash
 python3 -c "import pypdf" 2>&1 && echo "[pypdf] 已装" || echo "[pypdf] 缺失"
 ffmpeg -version >/dev/null 2>&1 && echo "[ffmpeg] 可用" || echo "[ffmpeg] 缺失(可选)"
-[ -f .env ] && ! grep -q "在这里填你的_key" .env && echo "[.env] 已配置" || echo "[.env] 待填 key(start_review.py 会自动复制 .env)"
+[ -f .env ] && ! grep -q "在这里填你的_key" .env && echo "[.env] 已配置" || echo "[.env] 待填 key(scripts/start_review.py 会自动复制 .env)"
 ```
 
 按结果处理:
@@ -24,19 +24,19 @@ ffmpeg -version >/dev/null 2>&1 && echo "[ffmpeg] 可用" || echo "[ffmpeg] 缺�
 |------|----------|--------------|
 | `pypdf` | 第 2 步需提取 PDF 简历时 | **询问用户**是否执行 `pip install -r requirements.txt`,同意后再装 |
 | `ffmpeg` | 第 3 步转写(**可选**,仅做音频预处理) | 提示「可选,不影响转写,仅跳过预处理」,不阻断 |
-| `.env` | 第 3 步转写(**必需**) | `start_review.py` 会自动复制 `.env`;提示用户填 `ASR_API_KEY` 真实值,配置前暂停 |
+| `.env` | 第 3 步转写(**必需**) | `scripts/start_review.py` 会自动复制 `.env`;提示用户填 `ASR_API_KEY` 真实值,配置前暂停 |
 
 > 是否需要 pypdf,可等第 1 步上传后按 `resume.replaced` / `resume.has_md` 判断;转写始终需要 `.env`。
 
 ## 1. 触发上传(运行脚本)
 
-运行 `start_review.py`,它会自动:启动上传服务 → 打开浏览器 → 等待提交
+运行 `scripts/start_review.py`,它会自动:启动上传服务 → 打开浏览器 → 等待提交
 简历 PDF + 面试录音(最长约 10 分钟)→ 写入结果并清理服务。
 
 ```bash
 STATUS="$(python3 -c "import tempfile,os;print(os.path.join(tempfile.gettempdir(),'interview_review','upload.json'))")"
 rm -f "$STATUS"
-python3 start_review.py --status "$STATUS"
+python3 scripts/start_review.py --status "$STATUS"
 ```
 > 脚本最长约 10 分钟,执行这条 Bash 命令时**把工具 timeout 设为 620000ms**,否则会提前中断。
 > 同时向用户提示:「请在弹出的页面上提交 简历 PDF + 面试录音,提交后我会自动开始复盘。」
@@ -57,9 +57,9 @@ python3 start_review.py --status "$STATUS"
 先判断是否需要提取(依据状态 JSON 的 `resume` 字段):
 
 - **跳过提取**(直接复用):`resume.replaced == false` 且 `resume.has_md == true`
-  → 简历未变、md 已存在,直接用 `resume.md_path`,不重新运行 `pdf2text.py`。
+  → 简历未变、md 已存在,直接用 `resume.md_path`,不重新运行 `scripts/pdf2text.py`。
 - **需要提取**:本次上传了新简历(`replaced == true`,无论 md 是否存在),或尚无 md(`has_md == false`)
-  → 运行 `python3 pdf2text.py "<resume.path>"`(不传输出文件,读取 stdout 文本),
+  → 运行 `python3 scripts/pdf2text.py "<resume.path>"`(不传输出文件,读取 stdout 文本),
   把提取出的文本整理成 Markdown(保留结构、修正换行与明显识别误差),**覆盖写入** `resume/个人简历.md`。**仅整理,不做分析。**
 
 > resume/ 下只保留一份简历 md(`resume/个人简历.md`):沿用现有简历且 md 已存在时复用,上传新简历时重新提取覆盖。
@@ -72,7 +72,7 @@ python3 start_review.py --status "$STATUS"
 - `.env` 已在第 0 步确认;若运行仍报缺配置,回到第 0 步处理。
 - 运行转写:
   ```bash
-  ./transcribe.py "interview/media/<session>.<ext>" "interview/txt/<session>.txt"
+  ./scripts/transcribe.py "interview/media/<session>.<ext>" "interview/txt/<session>.txt"
   ```
 - 读取转录文本,结合简历背景(`resume/个人简历.md`)整理并**写回** `interview/txt/<session>.txt`:
   - 把「面试官」与「候选人」双方话语分开排版;

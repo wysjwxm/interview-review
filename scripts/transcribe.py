@@ -7,7 +7,7 @@
 # 要求 Python 3.8+。
 #
 # 用法:
-#   python3 transcribe.py <音频文件> [输出文件]
+#   python3 scripts/transcribe.py <音频文件> [输出文件]
 #   不传输出文件时,结果打印到标准输出。
 # ============================================================
 import argparse
@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 from urllib import error, request
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # scripts/ 的上级 = 项目根
 
 
 def load_dotenv(path: Path) -> None:
@@ -143,7 +143,7 @@ def main() -> None:
     parser.add_argument("output", nargs="?", help="输出文件路径(省略则打印到标准输出)")
     args = parser.parse_args()
 
-    load_dotenv(SCRIPT_DIR / ".env")
+    load_dotenv(PROJECT_ROOT / ".env")
 
     base_url = require("ASR_BASE_URL").rstrip("/")
     api_key = require("ASR_API_KEY")

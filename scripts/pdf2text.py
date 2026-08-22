@@ -7,7 +7,7 @@
 # 仅提取文字,不做分析;Markdown 包装由工作流后续完成。
 #
 # 用法:
-#   python3 pdf2text.py <PDF文件> [输出文件]
+#   python3 scripts/pdf2text.py <PDF文件> [输出文件]
 #   不传输出文件时,文本打印到标准输出。
 #
 # 安装依赖(全项目只有这一个 pip 依赖):

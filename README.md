@@ -33,7 +33,7 @@ cp .env.example .env        # 编辑填 ASR_BASE_URL / ASR_API_KEY / ASR_MODEL
 brew install ffmpeg         # macOS;Linux 用 apt,Windows 到官网下载
 
 # 4. 一键上传式复盘(自动弹出浏览器上传页)
-python3 start_review.py
+python3 scripts/start_review.py
 ```
 
 ---
@@ -57,7 +57,7 @@ python3 start_review.py
 ### 方式一:一键上传式复盘(推荐)
 
 ```bash
-python3 start_review.py
+python3 scripts/start_review.py
 ```
 
 脚本自动完成:启动本地上传服务 → 打开浏览器上传页 → 等待提交「简历 PDF + 面试录音」(最长约 10 分钟)→ 写入结果到状态文件(默认 `$TMPDIR/interview_review/upload.json`)并清理服务。首次运行会自动创建 `resume/`、`interview/` 所需目录。
@@ -73,7 +73,7 @@ python3 start_review.py
 ### 方式二:直接转写音频
 
 ```bash
-./transcribe.py "interview/media/<名>.<扩展名>" "interview/txt/<名>.txt"
+./scripts/transcribe.py "interview/media/<名>.<扩展名>" "interview/txt/<名>.txt"
 ```
 
 - 依赖已配置的 `.env`(ASR 服务)与 ffmpeg(可选,自动检测)。
@@ -82,7 +82,7 @@ python3 start_review.py
 ### 方式三:提取简历文本
 
 ```bash
-python3 pdf2text.py "resume/media/<名>.pdf"
+python3 scripts/pdf2text.py "resume/media/<名>.pdf"
 ```
 
 - 文本打印到标准输出;可传第二个参数写入文件。
@@ -126,13 +126,16 @@ python3 pdf2text.py "resume/media/<名>.pdf"
 │   ├── media/      # 面试录音(不入库)
 │   ├── txt/        # 转录文本
 │   └── <名>.md     # 生成的复盘分析文档
-├── transcribe.py   # 音频转文本(云端 API,动态配置)
-├── pdf2text.py     # PDF 简历转文本(依赖 pypdf)
-├── upload_server.py # 上传服务(纯标准库,本地 127.0.0.1)
-├── upload_page.html # 浏览器上传页面
-├── start_review.py  # 一键触发上传脚本(自动创建所需目录)
+├── scripts/        # 可执行脚本
+│   ├── transcribe.py   # 音频转文本(云端 API,动态配置)
+│   ├── pdf2text.py     # PDF 简历转文本(依赖 pypdf)
+│   ├── upload_server.py # 上传服务(纯标准库,本地 127.0.0.1)
+│   └── start_review.py  # 一键触发上传脚本(自动创建所需目录)
+├── web/
+│   └── upload_page.html # 浏览器上传页面
+├── .env            # 本地配置(不入库;缺失时 start_review.py 自动复制)
+├── .env.example    # 转写服务配置模板(与 .env 同层级,复制为 .env 后填写)
 ├── requirements.txt # pip 依赖清单(仅 pypdf)
-├── .env.example    # 转写服务配置模板
 └── CLAUDE.md       # Claude Code 项目指令(可选,见「Claude Code 集成」)
 ```
 
@@ -142,11 +145,11 @@ python3 pdf2text.py "resume/media/<名>.pdf"
 
 - 上传服务只在 `127.0.0.1` 监听,文件不出本机。
 - 简历仅在本机分析,不上传任何服务。
-- 录音会经 `transcribe.py` 上传到你 `.env` 里配置的语音识别服务转写;若介意,可改用本地转写方案。
+- 录音会经 `scripts/transcribe.py` 上传到你 `.env` 里配置的语音识别服务转写;若介意,可改用本地转写方案。
 - `.gitignore` 默认忽略 `resume/`、`interview/`、`.env` 等隐私/媒体文件,仅跟踪 `.txt`/`.md`。
 
 ---
 
 ## Claude Code 集成(可选)
 
-本项目顺带提供了 Claude Code 的编排集成(`CLAUDE.md` + `.claude/commands/interview-review.md`),让「我要面试复盘」/ `/interview-review` 一键走完整复盘流程。这部分**不是必须的**——核心脚本(`start_review.py` 等)与任何 agent / 手工命令行都兼容;不使用 Claude Code 时,直接忽略 `.claude/` 目录即可。
+本项目顺带提供了 Claude Code 的编排集成(`CLAUDE.md` + `.claude/commands/interview-review.md`),让「我要面试复盘」/ `/interview-review` 一键走完整复盘流程。这部分**不是必须的**——核心脚本(`scripts/start_review.py` 等)与任何 agent / 手工命令行都兼容;不使用 Claude Code 时,直接忽略 `.claude/` 目录即可。
