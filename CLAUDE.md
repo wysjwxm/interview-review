@@ -10,7 +10,7 @@
 |------|------|----------|----------|
 | `分析简历 <名>` | 提取简历文本 | `resume/media/<名>.pdf` | `resume/个人简历.md` |
 | `分析面试音频 <名>` | 转写并复盘录音 | `interview/media/<名>.<扩展名>` | `interview/txt/<名>.txt` + `interview/<名>.md` |
-| `我要面试复盘`(或 `/review`) | 运行 `start_review.py`,弹出上传页面、提交简历 PDF + 面试录音 | 用户在浏览器上传(经 `upload_server.py`) | 自动执行下方「我要面试复盘」流程 |
+| `我要面试复盘`(或 `/interview-review`) | 运行 `start_review.py`,弹出上传页面、提交简历 PDF + 面试录音 | 用户在浏览器上传(经 `upload_server.py`) | 自动执行下方「我要面试复盘」流程 |
 
 `<名>` 为多媒体文件的**不含扩展名的文件名**。若你只给了部分名字或文件名不确定,先列出 `media/` 目录下文件让你确认,再执行。
 
@@ -30,7 +30,7 @@
 ├── upload_server.py # 「我要面试复盘」上传服务(纯 Python 标准库,跨平台,本地 127.0.0.1)
 ├── upload_page.html # 「我要面试复盘」浏览器上传页面
 ├── start_review.py  # 「我要面试复盘」一键触发脚本(用户可直接运行,或由 Claude 运行)
-├── .claude/commands/review.md # 「我要面试复盘」/`/review` 的编排流程说明
+├── .claude/commands/interview-review.md # 「我要面试复盘」/`/interview-review` 的编排流程说明
 ├── requirements.txt # Python 依赖清单(仅 pypdf)
 ├── .env.example    # 转写服务配置模板(复制为 .env 后填写)
 ├── CLAUDE.md
@@ -60,7 +60,7 @@
 
 ### `我要面试复盘`(上传式复盘)
 
-用户说「我要面试复盘」(或调用 `/review`)时,运行一键触发脚本 `start_review.py`(用户在终端直接运行它也可以),随后自动执行完整复盘。详细步骤见 `.claude/commands/review.md`,此处为概要:
+用户说「我要面试复盘」(或调用 `/interview-review`)时,运行一键触发脚本 `start_review.py`(用户在终端直接运行它也可以),随后自动执行完整复盘。详细步骤见 `.claude/commands/interview-review.md`,此处为概要:
 
 1. **触发上传**:运行 `python3 start_review.py`,脚本自动完成——启动上传服务、打开浏览器上传页、等待提交(最多约 10 分钟)、写入结果并清理服务。用户提交简历 PDF + 面试录音。
 2. **读取状态**:`start_review.py` 把上传结果写入状态 JSON(默认 `$TMPDIR/interview_review/upload.json`),读取 `session_name`、`resume.path`、`resume.md_path`、`resume.replaced`、`resume.has_md`、`audio.path`、`audio.ext`。

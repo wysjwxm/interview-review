@@ -10,7 +10,7 @@
 两种使用方式:
 - 用户直接在终端运行:`python3 start_review.py`
   → 上传完成后,回到 Claude 说一声,由 Claude 读取状态文件继续复盘。
-- Claude 收到「我要面试复盘」/ `/review` 时:直接运行本脚本
+- Claude 收到「我要面试复盘」/ `/interview-review` 时:直接运行本脚本
   → 退出码 0 后读取状态文件,继续做简历提取、转写与复盘文档生成。
 
 用法:
