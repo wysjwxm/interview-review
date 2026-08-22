@@ -8,6 +8,26 @@ description: 弹出上传页面(简历 PDF + 面试录音),自动执行面试复
 触发统一走一键脚本 `start_review.py`(纯 Python 标准库,跨平台,全程只在本机 `127.0.0.1` 监听);
 用户也可以自己在终端直接运行该脚本完成上传,再回到对话让我继续。
 
+## 0. 依赖预检(先做,避免执行到一半才发现缺依赖)
+
+流程开始先一次性检查本次会用到的依赖,缺失则**主动询问用户是否安装/配置**,不要等到执行某一步才被动发现。用一条命令快速判断:
+
+```bash
+python3 -c "import pypdf" 2>&1 && echo "[pypdf] 已装" || echo "[pypdf] 缺失"
+ffmpeg -version >/dev/null 2>&1 && echo "[ffmpeg] 可用" || echo "[ffmpeg] 缺失(可选)"
+[ -f .env ] && ! grep -q "在这里填你的_key" .env && echo "[.env] 已配置" || echo "[.env] 待填 key(start_review.py 会自动复制 .env)"
+```
+
+按结果处理:
+
+| 依赖 | 何时必需 | 缺失时的处理 |
+|------|----------|--------------|
+| `pypdf` | 第 2 步需提取 PDF 简历时 | **询问用户**是否执行 `pip install -r requirements.txt`,同意后再装 |
+| `ffmpeg` | 第 3 步转写(**可选**,仅做音频预处理) | 提示「可选,不影响转写,仅跳过预处理」,不阻断 |
+| `.env` | 第 3 步转写(**必需**) | `start_review.py` 会自动复制 `.env`;提示用户填 `ASR_API_KEY` 真实值,配置前暂停 |
+
+> 是否需要 pypdf,可等第 1 步上传后按 `resume.replaced` / `resume.has_md` 判断;转写始终需要 `.env`。
+
 ## 1. 触发上传(运行脚本)
 
 运行 `start_review.py`,它会自动:启动上传服务 → 打开浏览器 → 等待提交
@@ -44,13 +64,12 @@ python3 start_review.py --status "$STATUS"
 
 > resume/ 下只保留一份简历 md(`resume/个人简历.md`):沿用现有简历且 md 已存在时复用,上传新简历时重新提取覆盖。
 
-- 若提示缺少 pypdf:请用户先执行 `pip install -r requirements.txt` 后重试本步。
+- 若提示缺少 pypdf:回到第 0 步安装(理论上已预检)。
 - 若提示 PDF 无文本层(扫描/图片型):告知需 OCR,并说明转录流程不依赖简历、继续执行第 3 步。
 
 ## 3. 转写并整理录音
 
-- 确认项目根目录 `.env` 已配置 `ASR_BASE_URL` / `ASR_API_KEY` / `ASR_MODEL`;
-  若缺失,提示用户复制 `.env.example` 填写后重试本步,并在用户配置前暂停。
+- `.env` 已在第 0 步确认;若运行仍报缺配置,回到第 0 步处理。
 - 运行转写:
   ```bash
   ./transcribe.py "interview/media/<session>.<ext>" "interview/txt/<session>.txt"

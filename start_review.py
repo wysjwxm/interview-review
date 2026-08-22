@@ -2,6 +2,7 @@
 """面试复盘 · 一键触发上传
 
 运行本脚本 = 弹出上传页并等待提交材料:
+    0. 自动创建 resume/media、interview/media、interview/txt 目录;若 .env 缺失则从 .env.example 复制(首次运行无需手动准备)
     1. 启动本地上传服务(upload_server.py,127.0.0.1 随机端口)
     2. 打开浏览器上传页(简历 PDF + 面试录音)
     3. 等待提交完成(最长约 10 分钟)
@@ -76,13 +77,33 @@ def _quiet_unlink(path: Path) -> None:
         pass
 
 
-def _precheck(root: Path) -> Optional[str]:
+def _ensure_dirs(root: Path) -> None:
+    """确保项目所需目录存在(首次运行时自动创建,无需手动 mkdir)。"""
+    for sub in ("resume/media", "interview/media", "interview/txt"):
+        (root / sub).mkdir(parents=True, exist_ok=True)
+
+
+def _ensure_env() -> None:
+    """若 .env 不存在,从 .env.example 复制一份(不覆盖已有 .env)。
+
+    复制后 ASR_API_KEY 仍为占位符,用户需自行填写真实值。
+    """
+    env = SCRIPT_DIR / ".env"
+    example = SCRIPT_DIR / ".env.example"
+    if env.exists() or not example.is_file():
+        return
+    try:
+        env.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
+        print("已从 .env.example 复制 .env:请填写 ASR_API_KEY 等配置。", file=sys.stderr)
+    except OSError:
+        pass
+
+
+def _precheck() -> Optional[str]:
     """前置检查;通过返回 None,否则返回错误信息(已含「错误:」前缀)。"""
     for name in ("upload_server.py", "upload_page.html"):
         if not (SCRIPT_DIR / name).is_file():
             return f"错误:项目根缺少 {name}"
-    if not (root / "interview").is_dir():
-        return f"错误:{root} 不是有效的项目根目录(缺少 interview/)"
     return None
 
 
@@ -184,7 +205,10 @@ def main() -> int:
     status_file = Path(args.status)
     status_file.parent.mkdir(parents=True, exist_ok=True)
 
-    err = _precheck(root)
+    _ensure_dirs(root)
+    _ensure_env()
+
+    err = _precheck()
     if err:
         print(err, file=sys.stderr)
         return 1

@@ -2,70 +2,53 @@
 
 个人工具:对技术面试录音进行复盘、分析,生成可操作的改进建议。
 
-设计原则:**纯 Python 标准库**(除一个 `pypdf`)、跨平台(Windows / macOS / Linux)、本地运行、数据不出本机。除转写会按 `.env` 配置上传语音识别服务外,其余全程只在本机 `127.0.0.1` 处理。
+- **纯 Python 标准库**(除一个 `pypdf`)、跨平台(Windows / macOS / Linux)、本地运行。
+- 除转写会按 `.env` 配置上传语音识别服务外,其余全程只在本机 `127.0.0.1` 处理。
+- 三步产出:简历 PDF → Markdown;面试录音 → 转录文本(区分说话人、纠错)→ 5 章节复盘文档。
 
 ---
 
-## 功能特性
+## 快速上手
 
-- **简历文本提取** — PDF → 纯文本,轻量清理后整理为 Markdown。
-- **面试音频转写** — 云端语音识别(OpenAI 兼容 API),服务可动态切换,只需改 `.env`。
-- **一键上传式复盘** — 本地网页拖拽上传「简历 PDF + 面试录音」,自动落盘并生成结构化复盘文档(5 个章节)。
-- **隐私友好** — 上传服务只在 `127.0.0.1` 监听;简历仅在本机分析;媒体文件默认不入 git。
+最快路径是**用 Claude Code 全自动**;也支持纯命令行手动操作。
 
----
+### 方式 A:Claude Code 一键复盘(推荐)
 
-## 环境要求
+对 Claude Code 说一句 **「我要面试复盘」**(或 `/interview-review`),它会:
 
-| 依赖 | 类型 | 用途 | 安装方式 |
-|------|------|------|----------|
-| Python 3.8+ | 运行时 | 全部脚本 | mac系统自带，若无请自行安装 |
-| pypdf | pip 包 | PDF 简历文本提取 | `pip install -r requirements.txt` |
-| ffmpeg | 系统二进制 | 音频预处理(统一转 16kHz mp3) | `brew install ffmpeg` / `apt install ffmpeg` |
-| 语音识别服务 | 云端 API | 音频转文字 | 配 `.env`(见下文) |
+1. 自动检查依赖(`pypdf` / `ffmpeg` / `.env`),**缺失时主动询问你是否安装/配置**;
+2. 弹出浏览器上传页,提交「简历 PDF + 面试录音」;
+3. 自动完成简历提取 → 转写 → 整理 → 生成复盘文档。
 
-> 除 `pypdf` 外,项目**不依赖任何第三方 Python 库**;ffmpeg 与语音识别服务不是 pip 依赖,故不在 `requirements.txt` 中。
-
----
-
-## 安装
+### 方式 B:纯命令行手动操作
 
 ```bash
-# 1. 克隆仓库
-git clone <repo-url> && cd interview-review
-
-# 2. 安装 Python 依赖(仅 pypdf)
+# 1. 安装依赖(全项目仅 pypdf 一个 pip 包)
 pip install -r requirements.txt
 
-# 3. 配置语音识别服务(需要转写时)
-cp .env.example .env   # 然后编辑 .env,填好 ASR_BASE_URL / ASR_API_KEY / ASR_MODEL
+# 2. 配置语音识别服务(需要转写时);start_review.py 会自动复制 .env,也可手动:
+cp .env.example .env        # 编辑填 ASR_BASE_URL / ASR_API_KEY / ASR_MODEL
 
-# 4. (可选)安装 ffmpeg,用于音频预处理
-brew install ffmpeg    # macOS;Linux 用 apt,Windows 到官网下载
+# 3. (可选)安装 ffmpeg,用于音频预处理;缺失也能转写,只是跳过预处理
+brew install ffmpeg         # macOS;Linux 用 apt,Windows 到官网下载
+
+# 4. 一键上传式复盘(自动弹出浏览器上传页)
+python3 start_review.py
 ```
 
 ---
 
-## 目录结构
+## 依赖说明(自动 or 手动安装)
 
-```
-.
-├── resume/
-│   ├── media/      # 简历 PDF(不入库;不删除不改名,最新者为当前简历)
-│   └── 个人简历.md  # 唯一的简历文档(提取后整理)
-├── interview/
-│   ├── media/      # 面试录音(不入库)
-│   ├── txt/        # 转录文本
-│   └── <名>.md     # 生成的复盘分析文档
-├── transcribe.py   # 音频转文本(云端 API,动态配置)
-├── pdf2text.py     # PDF 简历转文本(依赖 pypdf)
-├── upload_server.py # 上传服务(纯标准库,本地 127.0.0.1)
-├── upload_page.html # 浏览器上传页面
-├── start_review.py  # 一键触发上传脚本
-├── requirements.txt # pip 依赖清单(仅 pypdf)
-├── .env.example    # 转写服务配置模板
-└── CLAUDE.md       # Claude Code 项目指令(可选,见「Claude Code 集成」)
-```
+依赖既可**手动安装**,也可由 **Claude Code 读取流程后自动检查并(经你同意)安装**:
+
+| 依赖 | 何时必需 | 手动安装 | Claude Code 自动处理 |
+|------|----------|----------|----------------------|
+| `pypdf` | 提取 PDF 简历时 | `pip install -r requirements.txt` | 主动检查,缺失时询问后安装 |
+| `ffmpeg` | 转写音频(**可选**,仅预处理) | `brew install ffmpeg` / `apt install ffmpeg` | 缺失不阻断,跳过预处理 |
+| `.env` | 转写音频(**必需**) | `cp .env.example .env` 并填写(或由脚本自动复制) | 脚本自动复制后提示你填 key,配置前暂停 |
+
+> 除 `pypdf` 外,项目**不依赖任何第三方 Python 库**;`ffmpeg` 与语音识别服务不是 pip 依赖,故不在 `requirements.txt` 中。
 
 ---
 
@@ -77,7 +60,7 @@ brew install ffmpeg    # macOS;Linux 用 apt,Windows 到官网下载
 python3 start_review.py
 ```
 
-脚本会自动完成:启动本地上传服务 → 打开浏览器上传页 → 等待提交「简历 PDF + 面试录音」(最长约 10 分钟)→ 写入结果到状态文件(默认 `$TMPDIR/interview_review/upload.json`)并清理服务。
+脚本自动完成:启动本地上传服务 → 打开浏览器上传页 → 等待提交「简历 PDF + 面试录音」(最长约 10 分钟)→ 写入结果到状态文件(默认 `$TMPDIR/interview_review/upload.json`)并清理服务。首次运行会自动创建 `resume/`、`interview/` 所需目录。
 
 上传页行为:
 
@@ -107,6 +90,19 @@ python3 pdf2text.py "resume/media/<名>.pdf"
 
 ---
 
+## 配置说明(`.env`)
+
+复制 `.env.example` 为 `.env` 后填写,支持任意 OpenAI 兼容的语音识别服务,换服务只需改三个变量:
+
+| 变量 | 说明 |
+|------|------|
+| `ASR_BASE_URL` | API 地址(不含 `/audio/transcriptions`) |
+| `ASR_API_KEY` | 密钥 |
+| `ASR_MODEL` | 模型名 |
+| `ASR_LANGUAGE` | (可选)显式指定语言,如 `zh` |
+
+---
+
 ## 复盘文档结构
 
 每次复盘生成的 `interview/<名>.md` 固定包含 5 个章节:
@@ -119,17 +115,26 @@ python3 pdf2text.py "resume/media/<名>.pdf"
 
 ---
 
-## 配置说明(`.env`)
+## 目录结构
 
-复制 `.env.example` 为 `.env` 后填写,支持任意 OpenAI 兼容的语音识别服务,换服务只需改三个变量:
-
-| 变量 | 说明 |
-|------|------|
-| `ASR_BASE_URL` | API 地址(不含 `/audio/transcriptions`) |
-| `ASR_API_KEY` | 密钥 |
-| `ASR_MODEL` | 模型名 |
-| `ASR_LANGUAGE` | (可选)显式指定语言,如 `zh` |
-
+```
+.
+├── resume/
+│   ├── media/      # 简历 PDF(不入库;不删除不改名,最新者为当前简历)
+│   └── 个人简历.md  # 唯一的简历文档(提取后整理)
+├── interview/
+│   ├── media/      # 面试录音(不入库)
+│   ├── txt/        # 转录文本
+│   └── <名>.md     # 生成的复盘分析文档
+├── transcribe.py   # 音频转文本(云端 API,动态配置)
+├── pdf2text.py     # PDF 简历转文本(依赖 pypdf)
+├── upload_server.py # 上传服务(纯标准库,本地 127.0.0.1)
+├── upload_page.html # 浏览器上传页面
+├── start_review.py  # 一键触发上传脚本(自动创建所需目录)
+├── requirements.txt # pip 依赖清单(仅 pypdf)
+├── .env.example    # 转写服务配置模板
+└── CLAUDE.md       # Claude Code 项目指令(可选,见「Claude Code 集成」)
+```
 
 ---
 

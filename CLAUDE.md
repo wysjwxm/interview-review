@@ -37,12 +37,24 @@
 └── .gitignore      # 只跟踪 .txt/.md,忽略 PDF/音频/密钥等
 ```
 
+## 依赖预检(执行任何分析前)
+
+执行任何分析命令前,先检查依赖,缺失时**主动询问用户是否安装/配置**,不要等到执行时才发现:
+
+| 依赖 | 何时必需 | 缺失时的处理 |
+|------|----------|--------------|
+| `pypdf` | 提取 PDF 简历时 | 询问用户后 `pip install -r requirements.txt` |
+| `ffmpeg` | 转写音频(可选,仅预处理) | 缺失不阻断,跳过预处理直接上传原音频 |
+| `.env`(ASR_*) | 转写音频(必需) | `start_review.py` 会自动复制 `.env`;提示用户填 `ASR_API_KEY` 真实值,配置前暂停 |
+
+检查命令:`python3 -c "import pypdf"`、`ffmpeg -version`、`[ -f .env ]`。
+
 ## 工作流程
 
 ### `分析简历 <名>`
 
 1. 提取文本:运行 `python3 pdf2text.py "resume/media/<名>.pdf"`,读取脚本输出的文字。
-   > 首次使用前:`pip install -r requirements.txt`(仅一个依赖 `pypdf`,纯 Python、零传递依赖);若为扫描/图片型 PDF 无文本层,脚本会提示需 OCR。
+   > `pypdf` 依赖见「依赖预检」;若为扫描/图片型 PDF 无文本层,脚本会提示需 OCR。
 2. 把提取出的文本整理成 Markdown(保留原始结构,修正换行与明显识别误差),**覆盖写入** `resume/个人简历.md`。**不做分析**。
 
 ### `分析面试音频 <名>`
@@ -51,8 +63,7 @@
    ```bash
    ./transcribe.py "interview/media/<名>.<扩展名>" "interview/txt/<名>.txt"
    ```
-   > 首次使用前:复制 `.env.example` 为 `.env`,填好 `ASR_BASE_URL` / `ASR_API_KEY` / `ASR_MODEL`(见 `.env.example` 内注释,换服务只需改 `.env`)。
-   > 依赖 Python3、`ffmpeg`,均在本地,无需安装任何模型或第三方库。
+   > `.env` 配置见「依赖预检」(复制 `.env.example` 填 `ASR_*`,换服务只需改 `.env`);依赖 Python3 与 `ffmpeg`(可选),无需安装任何模型或第三方库。
 2. **整理转录文本**(写回 `interview/txt/<名>.txt`):对原始转录做二次处理——
    - 分析问答双方话语,把「面试官」与「候选人」**分开排版**;
    - 结合候选人的**技术背景、行业背景**(参考简历),纠正识别错误的字词(技术名词、专业术语等,如 "ncks"→Nacos、"县程"→线程),并把纠正后的内容写回转录文本。
