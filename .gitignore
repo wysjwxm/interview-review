@@ -15,7 +15,12 @@ __pycache__/
 # resume / interview 目录为个人隐私，不进入git管理，如有需要，自行放行
 # ============================================================
 
-resume/
+# 忽略 resume 下全部内容
+resume/**/*
+
+# 不忽略：以 底稿.md 结尾的md文件
+!resume/**/*底稿.md
+
 
 # 先忽略 interview 目录下全部内容
 interview/*
