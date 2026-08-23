@@ -17,4 +17,8 @@ __pycache__/
 
 resume/
 
-interview/
+# 先忽略 interview 目录下全部内容
+interview/*
+
+# 不忽略 interview 下直接的md文件（一级，不会递归子目录）
+!interview/*.md
