@@ -27,3 +27,8 @@ interview/*
 
 # 不忽略 interview 下直接的md文件（一级，不会递归子目录）
 !interview/*.md
+.agents/skills/source-command-interview-review/SKILL.md
+.gitignore
+interview/跨面试弱点汇总.md
+interview/项目追问预案.md
+/process/
