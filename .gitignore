@@ -26,3 +26,4 @@ interview/*
 .gitignore
 interview/跨面试弱点汇总.md
 interview/项目追问预案.md
+/process/
