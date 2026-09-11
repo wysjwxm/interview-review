@@ -1,10 +1,43 @@
-## HashMap 
+## JVM
 
-##### 重写hashCode&equals
+### 1. 内存模型
+
+<img src="/Users/wenguang/Projects/interview-review/knowledge/assets/image-20260911220451212.png" alt="image-20260911220451212" style="zoom: 67%;" />
+
+1. 私有空间
+   1. 虚拟机栈：由栈帧构成
+   2. 本地方法栈
+   3. 程序计数器：控制分支执行、保存当前执行位置
+2. 堆
+   1. 分新生代（eden+survivor）、老年代（old generation），随着经历垃圾回收次数而升级存储区
+   2. 包括对象实例（对象头(包含Mark Word)、实例数据、对齐填充）、数组信息、字符串常量池
+3. 本地内存
+   1. 元空间
+   2. 直接内存
+
+### 2. 线程
+
+1. 六个生命状态<img src="/Users/wenguang/Projects/interview-review/knowledge/assets/image-20260911231411122.png" alt="image-20260911231411122" style="zoom:50%;" />
+   1. NEW: 初始状态，线程被创建出来但没有被调用 `start()`。
+   2. RUNNABLE: 运行状态，线程被调用了 `start()` 等待运行的状态。
+   3. BLOCKED：阻塞状态，需要等待锁释放。
+   4. WAITING：等待状态，表示该线程需要等待其他线程做出一些特定动作（通知或中断）。
+   5. TIMED_WAITING：超时等待状态，可以在指定的时间后自行返回而不是像 WAITING 那样一直等待。
+   6. TERMINATED：终止状态，表示该线程已经运行完毕。
+
+
+
+
+
+## 容器
+
+### 1. HashMap 
+
+#### 1. 重写hashCode&equals
 
 1. 用自定义类做key需要重写hashCode&equals：等值判断方式决定，第一步：用 hashCode 定位桶  →  桶下标 = hash & (n-1) 第二步：在桶里用 equals 逐个比对  →  找到匹配的节点
 
-##### ConcurrentHashMap
+#### 2. ConcurrentHashMap
 
 1. put
    1. 桶为空时用 **CAS** 写入，无锁。cas失败，等下一轮循环重新判定走CAS还是sync
@@ -14,9 +47,17 @@
 
 
 
+### 2. 阻塞队列
+
+1. 使用notFull和notEmpty两个Condition（队列）
+2. put时队列满则将线程放到notFull去等待，put成功后唤醒notEmpty
+3. take时队列空则将线程放到notEmpty去等待，take成功后唤醒notFull
+
+
+
 ## 锁
 
-##### CAS
+### 1. CAS
 
 1. `CAS(V, exptV, newV): if(V==exptV) V=newV`  注意，方法中的V为内存地址，if中的V为内存地址对应值
 2. CAS比锁快：CAS-CPU指令，sync操作系统介入
@@ -26,27 +67,78 @@
 
 
 
-##### ReentrantLock
+### 2. AQS
 
-1. 按请求顺序排队获取。新线程可以和队头抢锁。
+#### 1. 内部实现
+
+1. AbstractQueuedSynchronizer。实现排队、挂起、唤醒，子类只需定制：怎么算抢到、抢到怎么释放
+2. volatile state，由实现类决定
+   1. ReentrantLock：0 = 锁空闲，>0 = 被占用且记录重入次数
+   2. CountDownLatch：state表还需要 countDown 几次
+   3. Semaphore：控制同时获取一资源的线程数量，state表还可获得许可的线程数
+3. CLH 变种双向队列：CLH 是隐式单向链表，纯自旋；AQS 是显式双向链表，自旋几次后挂起线程（park），被唤醒再自旋
+4. CAS
 
 
 
-##### synchronized渐进
+#### 2. ReentrantLock
 
-1. **偏向锁**：只有一个线程访问时，不 CAS，偏向（我属于线程 A，线程 A 再来时直接放行）（高版本jdk默认关）
+1. 优于synchronized
+   1. 公平锁
+   2. 可中断
+   3. trylock
+   4. condotion
+
+
+
+### 3. synchronized
+
+#### 1. 字节码
+
+1. 通过monitorenter获取锁，通过锁状态判断执行逻辑
+2. 通过monitorexit释放锁（正常和异常都会释放）
+
+
+
+#### 2. 锁升级
+
+1. **偏向锁**：Mark Word 记录线程ID，若是同一线程，不CAS设置MW（高版本jdk默认关）
 2. **轻量级锁**：有轻度竞争时，线程自旋 CAS 尝试获取，不挂起
+   1. 交替持锁，无并行竞争
+   2. CAS抢锁：修改MarkWord。将Mark Word放入栈的LockRecord，将锁对象头的Mark Word换成指向栈中lockrecord的指针，以判断是哪个线程
+   3. CAS释放锁：修改MarkWord为LockRecord里保存的Displaced Mark Word
+   4. CAS抢锁失败
+      1. 同一线程重入，再创建lockrecord，靠lockrecord数量实现重入控制
+      2. 不同线程，自选重试（自适应自选，即退避重试），多次自旋拿不到会锁升级
 3. **重量级锁**：竞争激烈或自旋超过次数，升级为操作系统互斥量，线程挂起
+   1. 锁对象头的指针开辟的ObjectMonitor，通过Monitor判断是哪个线程
+   2. 等待队列包括以下
+      1. entrylist双向链表，其他队列迁移到entrylist再进行锁资源获取
+      2. waitset双向链表（wait放入，notify移到entrylist）
+   3. owner表示当前占用资源的线程
+   4. count占用次数
 
 
 
-##### 可重入
+#### 3. Monitor
 
-1. 锁内部记录了**持有线程**和**重入次数**，同一个线程再来就次数 +1，退出时次数 -1，减到 0 才真正释放
+1. 抢锁，owner为空，设置owner，锁重入则count++
+2. 抢不到锁，入队，调用原语park挂起线程 交出cpu
+3. 释放锁，count为0时，清空owner，唤醒EntryList的线程来竞争锁（而非持有资源，可能被i新线程抢走，所以非公平）
 
 
 
-##### volatile
+#### 4. 修饰方法
+
+1. 进入方法时争抢锁对象，若是实例方法抢实例的锁，若是类方法抢class的锁
+
+
+
+
+
+
+
+### 4. volatile
 
 1. 写：线程改的是自己工作内存的副本，什么时候刷回主内存是不确定的。修改变量后立即刷回主内存，并让其他 CPU 核心上这个变量的缓存行失效。
 
@@ -72,14 +164,25 @@
 
 
 
-##### AQS
+### 5. ThreadLocal
 
-1. AbstractQueuedSynchronizer。实现排队、挂起、唤醒，子类只需定制：怎么算抢到、抢到怎么释放
-2. volatile state，由实现类决定
-   1. ReentrantLock：0 = 锁空闲，>0 = 被占用且记录重入次数
-   2. CountDownLatch：还需要 countDown 几次
-3. CLH 变种双向队列：CLH 是隐式单向链表，纯自旋；AQS 是显式双向链表，自旋几次后挂起线程（park），被唤醒再自旋
-4. CAS
+1. TODO
+
+
+
+### 6.ThreadPool
+
+1. TODO
+
+
+
+
+
+## 基础
+
+### 1. BigDecimal
+
+1. TODO
 
 
 

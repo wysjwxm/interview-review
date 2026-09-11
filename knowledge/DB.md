@@ -34,10 +34,25 @@
 1. 作用：用来做数据的同步、备份。所有引擎都有
 2. 形式：可配置是生成执行的sql-statement，还是填充参数的sql-row，还是混合存储-mixed（仅在右歧义时填充参数）。
 3. 事务执行中，写入binlog cache，提交后写入binlog文件
-4. 两阶段提交![image-20260831223624961](/Users/wenguang/Library/Application Support/typora-user-images/image-20260831223624961.png)
+4. 两阶段提交![image-20260831223624961](/Users/wenguang/Projects/interview-review/knowledge/assets/image-20260831223624961.png)
    1. 事务执行中写redolog是prepare阶段，事务提交，写入binlog，redolog改成commit阶段
    2. 场景1：重启时发现redolog还在prepare & 无binlog，弃用redolog
    3. 场景2：重启时发现redolog还在prepare & 有binlog，前滚redolog（解决设置为commit时失败的场景）
+
+
+
+#### ✨事务原理
+
+1. Atomic：一些操作同时成功失败，失败时通过undolog回滚可以可以实现
+2. Consistency：通过AID和业务操作保障
+3. Isolation：通过MVCC+锁机制实现
+4. Duration：通过redolog实现崩溃恢复及数据持久化
+
+
+
+#### MVCC
+
+1. TODO
 
 
 
@@ -105,10 +120,19 @@
 2. 跨存储引擎的功能（存储过程、触发器、视图、函数、binlog）
 3. 做orderby、join、where...
 
-![56380eb361c1d7baf6239bc386280719](/Users/wenguang/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_itzdl6t7qgkj22_2050/temp/RWTemp/2026-09/56380eb361c1d7baf6239bc386280719.jpg)
+![mysql_contructure_1](/Users/wenguang/Projects/interview-review/knowledge/assets/mysql_contructure_1.jpg)
 
 #### 执行流程
 
 1. DQL：鉴权，词法语法，执行优化，鉴权，执行器调用，数据处理
 2. DML：走一遍DQL，写redolog buffer，写undolog，写BufferPool（Write-Ahead Logging），redolog-prepare落盘，binlog落盘，redolog-commit落盘
 
+
+
+
+
+## 6. 基础
+
+### 数据类型
+
+1. TODO
