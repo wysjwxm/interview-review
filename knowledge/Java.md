@@ -45,6 +45,16 @@
 2. get无锁：Node.val, Node.next都声明为vialote保证可见性
 3. size：弱一致性，因为读size做累加过程中其他线程还可以并发写 Cell /baseCount
 
+#### 3. 树化
+
+1. tab.size>=64 & 桶i.size==8 树化
+2. resize时，桶i.size==6链化，不是8是为了防止在树链之间频繁震荡
+
+#### 4. Resize
+
+1. `size = maxsize * loadFactor`时扩容，*2
+2. 桶位置是由`hash&(oldCap-1)`得到，新容量是2倍，则newMask比oldMask多了一位，只需要计算新增的一位和桶中节点的位运算结果，即可将桶中元分成2分，low放到新数组的同一个idx位置，high放到新数组的新idx
+
 
 
 ### 2. 阻塞队列
@@ -161,6 +171,7 @@
 
       1. volatile 写之前的所有操作，必须在 volatile 写之前完成
       2. volatile 读之后的所有操作，必须在 volatile 读之后开始
+      3. ✅对一个 volatile 变量的写操作 happens-before 于随后对同一个变量的读操作
 
 
 
@@ -178,11 +189,22 @@
 
 
 
+## 定时任务
+
+1. 单实例任务用小根堆实现，堆顶任务执行久会推迟其他任务、堆顶任务抛未捕获异常会中断其他任务
+2. 系统时间如果被人为回拨，任务调度会错乱
+3. ScheduledThreadPoolExecutor内也是堆，但有多线程调度，可避免任务推迟
+4. 时间轮比堆的优势：插入复杂度为O1，可维护圈数或多层时间轮实现较久的延迟
+
+![three-layers-of-time-wheel](assets/three-layers-of-time-wheel.png)
+
 ## 基础
 
 ### 1. BigDecimal
 
-1. TODO
+1. 通过bigint实现，bigint内部为多个数组
+1. 不推荐`new BigDecimal(double)`，传入double时精度已经丢失
+1. compareTo比去精度值，equals比带精度值
 
 
 

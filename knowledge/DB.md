@@ -52,7 +52,7 @@
 
 #### MVCC
 
-1. TODO
+1. 隐藏字段+MVCC+undolog
 
 
 
@@ -106,7 +106,7 @@
 1. left join，左表会作驱动表（右表可为空），可通过`/*+JOIN_ORDER(A,B)*/`控制连接顺序
 2. Index Nested-Loop Join
 3. Block Nested-Loop Join
-4. Hash Join, 将驱动表编程hash表，被驱动表去hash表匹配数据
+4. Hash Join, 将驱动表编成hash表，被驱动表去hash表匹配数据
 
 
 
@@ -135,4 +135,11 @@
 
 ### 数据类型
 
-1. TODO
+1. 数值
+   1. Oracle都用Number，MySQL分了各种整型、浮点、Decimal。
+   2. Number和Decimal前方都是表示总位数
+2. varchar，Oracle字节，MySQL字符
+3. 时间
+   1. Oracle，DATE，DateTimeStamp
+   2. MySQL，DATE只有日
+4. 大文本，Oracle clob，mysql Text
